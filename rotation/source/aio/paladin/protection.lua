@@ -108,6 +108,14 @@ end
 
 -- Returns true if the currently configured seal is active
 local function has_configured_seal(context)
+    -- Temporarily treat Seal of Wisdom as the configured seal when recovering mana
+    if context.settings.use_seal_of_wisdom_low_mana then
+        local threshold = context.settings.seal_of_wisdom_mana_pct or 20
+        if context.mana_pct <= threshold then
+            return context.seal_wisdom_active
+        end
+    end
+    
     local choice = context.settings.prot_seal_choice or "righteousness"
     if choice == "vengeance" then return context.seal_vengeance_active end
     if choice == "wisdom" then return context.seal_wisdom_active end
@@ -173,14 +181,14 @@ local Prot_Racial = {
             return A.Stoneform:Show(icon), "[PROT] Stoneform"
         end
         return nil
-    end,
-}
-
--- [6] Establish configured seal (ensure primary seal is always active)
-local Prot_EstablishSeal = {
-    requires_combat = true,
-
-    matches = function(context, state)
+    end,-- Allow Seal of Wisdom override for emergency mana recovery
+        if context.settings.use_seal_of_wisdom_low_mana then
+            local threshold = context.settings.seal_of_wisdom_mana_pct or 20
+            if context.mana_pct <= threshold and context.seal_wisdom_active then
+                return false  -- Don't override SoW while recovering mana
+            end
+        end
+        
         if has_configured_seal(context) then return false end
         return true
     end,
@@ -223,6 +231,15 @@ local Prot_Consecration = {
     matches = function(context, state)
         if not context.settings.prot_use_consecration then return false end
         if context.mana_pct < Constants.MANA.PROT_CONSEC_PCT then return false end
+        
+        -- Low mana mode: only use Consecration on 2+ targets to conserve mana
+        if context.settings.use_seal_of_wisdom_low_mana then
+            local threshold = context.settings.seal_of_wisdom_mana_pct or 20
+            if context.mana_pct <= threshold and context.enemy_count < 2 then
+                return false
+            end
+        end
+        
         return true
     end,
 
@@ -260,6 +277,15 @@ local Prot_Exorcism = {
         if context.is_moving then return false end
         if not state.target_undead_or_demon then return false end
         if not state.can_exorcism then return false end
+        
+        -- Low mana mode: skip non-essential damage spells
+        if context.settings.use_seal_of_wisdom_low_mana then
+            local threshold = context.settings.seal_of_wisdom_mana_pct or 20
+            if context.mana_pct <= threshold then
+                return false
+            end
+        end
+        
         return true
     end,
 
@@ -296,6 +322,15 @@ local Prot_HammerOfWrath = {
     matches = function(context, state)
         if not context.settings.prot_use_hammer_of_wrath then return false end
         if not state.target_below_20 then return false end
+        
+        -- Low mana mode: skip non-essential damage spells
+        if context.settings.use_seal_of_wisdom_low_mana then
+            local threshold = context.settings.seal_of_wisdom_mana_pct or 20
+            if context.mana_pct <= threshold then
+                return false
+            end
+        end
+        
         return true
     end,
 
