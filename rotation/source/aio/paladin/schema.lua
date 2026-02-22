@@ -28,108 +28,45 @@ A.Data.ProfileEnabled[A.CurrentProfile] = true
 --   GetToggle(2, key), SetToggle({2, key, ...}), cached_settings[key], context.settings[key]
 
 _G.FluxAIO_SETTINGS_SCHEMA = {
-	-- Tab 1: General
-	[1] = {
-		name = "General",
-		sections = {
-			{
-				header = "Spec Selection",
-				settings = {
-					{
-						type = "dropdown",
-						key = "playstyle",
-						default = "retribution",
-						label = "Active Spec",
-						tooltip = "Which spec rotation to use.",
-						options = {
-							{ value = "retribution", text = "Retribution" },
-							{ value = "protection", text = "Protection" },
-							{ value = "holy", text = "Holy" },
-						},
-					},
-				},
-			},
-			{
-				header = "Utility",
-				settings = {
-					{
-						type = "checkbox",
-						key = "use_cleanse",
-						default = true,
-						label = "Auto Cleanse",
-						tooltip = "Automatically Cleanse poison, disease, and magic (if talented) from yourself.",
-					},
-					{
-						type = "checkbox",
-						key = "use_hammer_of_justice",
-						default = false,
-						label = "Hammer of Justice",
-						tooltip = "Use Hammer of Justice to interrupt enemy casts (stun, may break CC).",
-					},
-				},
-			},
-			{
-				header = "Recovery Items",
-				settings = {
-					{
-						type = "slider",
-						key = "healthstone_hp",
-						default = 35,
-						min = 0,
-						max = 100,
-						label = "Healthstone HP (%)",
-						tooltip = "Use Healthstone when HP drops below this. Set to 0 to disable.",
-						format = "%d%%",
-					},
-					{
-						type = "checkbox",
-						key = "use_healing_potion",
-						default = true,
-						label = "Use Healing Potion",
-						tooltip = "Use Healing Potion when HP drops low in combat.",
-					},
-					{
-						type = "slider",
-						key = "healing_potion_hp",
-						default = 25,
-						min = 10,
-						max = 50,
-						label = "Healing Potion HP (%)",
-						tooltip = "Use Healing Potion when HP drops below this.",
-						format = "%d%%",
-					},
-				},
-			},
-			{
-				header = "Emergency",
-				settings = {
-					{
-						type = "slider",
-						key = "divine_shield_hp",
-						default = 0,
-						min = 0,
-						max = 40,
-						label = "Divine Shield HP (%)",
-						tooltip = "Use Divine Shield when HP drops below this. Set to 0 to disable. Blocked by Forbearance.",
-						format = "%d%%",
-					},
-					{
-						type = "slider",
-						key = "lay_on_hands_hp",
-						default = 0,
-						min = 0,
-						max = 40,
-						label = "Lay on Hands HP (%)",
-						tooltip = "Use Lay on Hands when HP drops below this. Set to 0 to disable. Drains all mana. Blocked by Forbearance.",
-						format = "%d%%",
-					},
-				},
-			},
-			S.burst(),
-			S.dashboard(),
-			S.debug(),
-		},
-	},
+    -- Tab 1: General
+    [1] = { name = "General", sections = {
+        { header = "Spec Selection", settings = {
+            { type = "dropdown", key = "playstyle", default = "retribution", label = "Active Spec",
+              tooltip = "Which spec rotation to use.",
+              options = {
+                  { value = "retribution", text = "Retribution" },
+                  { value = "protection", text = "Protection" },
+                  { value = "holy", text = "Holy" },
+              }},
+        }},
+        { header = "Utility", settings = {
+            { type = "checkbox", key = "use_cleanse", default = true, label = "Auto Cleanse",
+              tooltip = "Automatically Cleanse poison, disease, and magic (if talented) from yourself." },
+            { type = "checkbox", key = "use_hammer_of_justice", default = false, label = "Hammer of Justice",
+              tooltip = "Use Hammer of Justice to interrupt enemy casts (stun, may break CC)." },
+        }},
+        { header = "Cooldown Management", settings = {
+            { type = "slider", key = "cd_min_ttd", default = 0, min = 0, max = 60, label = "CD Min TTD (sec)",
+              tooltip = "Don't use major CDs (trinkets, racial) if target dies sooner than this. Set to 0 to disable.", format = "%d sec" },
+        }},
+        { header = "Recovery Items", settings = {
+            { type = "slider", key = "healthstone_hp", default = 35, min = 0, max = 100, label = "Healthstone HP (%)",
+              tooltip = "Use Healthstone when HP drops below this. Set to 0 to disable.", format = "%d%%" },
+            { type = "checkbox", key = "use_healing_potion", default = true, label = "Use Healing Potion",
+              tooltip = "Use Healing Potion when HP drops low in combat." },
+            { type = "slider", key = "healing_potion_hp", default = 25, min = 10, max = 50, label = "Healing Potion HP (%)",
+              tooltip = "Use Healing Potion when HP drops below this.", format = "%d%%" },
+        }},
+        { header = "Emergency", settings = {
+            { type = "slider", key = "divine_shield_hp", default = 0, min = 0, max = 40, label = "Divine Shield HP (%)",
+              tooltip = "Use Divine Shield when HP drops below this. Set to 0 to disable. Blocked by Forbearance.", format = "%d%%" },
+            { type = "slider", key = "lay_on_hands_hp", default = 0, min = 0, max = 40, label = "Lay on Hands HP (%)",
+              tooltip = "Use Lay on Hands when HP drops below this. Set to 0 to disable. Drains all mana. Blocked by Forbearance.", format = "%d%%" },
+        }},
+        S.burst(),
+        S.dashboard(),
+        S.debug(),
+    }},
 
 	-- Tab 2: Retribution
 	[2] = {
