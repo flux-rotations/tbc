@@ -122,22 +122,18 @@ end
 local function getMeleeSwingRemaining()
     if not Player then return 0, 0 end
 
-    local now = GetTime()
-    local start = Player.GetSwingStart and Player:GetSwingStart(1) or 0
-    local duration = Player.GetSwing and Player:GetSwing(1) or 0
+    -- Player:GetSwing(slot) already returns the time REMAINING until the next
+    -- swing (Env.SwingDuration = period - elapsed), despite the "duration" name.
+    -- The old code did (start + GetSwing) - now, mis-reading it as a full swing
+    -- duration; with GetSwing as remaining that evaluates to period - 2*elapsed,
+    -- which bottoms out at the swing midpoint. Use the remaining value directly.
+    local remaining = Player.GetSwing and Player:GetSwing(1) or 0
+    if remaining <= 0 or remaining > 10 then remaining = 0 end
 
-    if start and start > 0 and duration and duration > 0 then
-        local remaining = (start + duration) - now
-        if remaining > 0 and remaining <= 10 then
-            return remaining, duration
-        end
-    end
+    local period = Player.GetSwingMax and (Player:GetSwingMax(1) or 0) or 0
+    if period <= 0 then period = remaining end
 
-    if duration and duration > 0 and duration <= 10 then
-        return duration, Player.GetSwingMax and (Player:GetSwingMax(1) or duration) or duration
-    end
-
-    return 0, Player.GetSwingMax and (Player:GetSwingMax(1) or 0) or 0
+    return remaining, period
 end
 
 local function getTargetRange(unit)
