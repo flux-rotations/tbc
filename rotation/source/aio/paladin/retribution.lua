@@ -194,52 +194,83 @@ local Ret_Racial = {
     end,
 }
 
--- [3] Opener: Seal of the Crusader → Judgement (Heart of the Crusader, +3% raid crit)
+-- Opener judgement options. Pre-allocated at load (no inline tables in the combat
+-- path). Each entry maps the dropdown choice to the seal to put up, the context
+-- flag that reports that seal active, the resulting Judgement debuff ID, and log
+-- labels. Crusader Strike refreshes ALL Judgements on the target, so a single
+-- pull-time application is maintained for the rest of the fight.
+local OPENER_JUDGE = {
+    crusader = {
+        seal = A.SealOfCrusader, seal_flag = "seal_crusader_active",
+        debuff = Constants.DEBUFF_ID.JUDGEMENT_CRUSADER,
+        seal_log = "[RET] Opener: Seal of the Crusader",
+        judge_log = "[RET] Opener: Judge Crusader (+3% raid crit)",
+    },
+    wisdom = {
+        seal = A.SealOfWisdom, seal_flag = "seal_wisdom_active",
+        debuff = Constants.DEBUFF_ID.JUDGEMENT_WISDOM,
+        seal_log = "[RET] Opener: Seal of Wisdom",
+        judge_log = "[RET] Opener: Judge Wisdom (raid mana)",
+    },
+    light = {
+        seal = A.SealOfLight, seal_flag = "seal_light_active",
+        debuff = Constants.DEBUFF_ID.JUDGEMENT_LIGHT,
+        seal_log = "[RET] Opener: Seal of Light",
+        judge_log = "[RET] Opener: Judge Light (raid healing)",
+    },
+}
+
+-- [3] Opener: matching Seal → Judgement, seeding the chosen Judgement debuff.
 -- Fires only in the first few seconds of combat and stops permanently once the
--- Judgement of the Crusader debuff is on the target. Crusader Strike (Ret talent)
--- refreshes all Judgements on hit, so this one application is maintained all fight.
+-- chosen Judgement debuff is on the target. Crusader Strike (Ret talent) refreshes
+-- all Judgements on hit, so this one application is maintained all fight — true for
+-- Crusader (+3% crit), Wisdom (mana) and Light (healing) alike.
 -- is_gcd_gated = false so the off-GCD Judgement step lands immediately once the
 -- seal is up (the on-GCD Seal cast is naturally skipped while on GCD via IsReady).
 local Ret_Opener = {
     requires_combat = true,
     requires_enemy = true,
     is_gcd_gated = false,
-    setting_key = "ret_opener_crusader",
 
     matches = function(context, state)
+        -- "off" (or unset) disables the opener entirely.
+        local opt = OPENER_JUDGE[context.settings.ret_opener_judge]
+        if not opt then return false end
         -- Pull-only: skip once we're past the opener window.
         if context.combat_time <= 0 or context.combat_time > OPENER_COMBAT_WINDOW then return false end
-        -- Within ~10yd: lets Seal of the Crusader (a self-buff) go up while closing,
-        -- so it's ready by the time we're in Judgement range. The Judgement step
-        -- self-gates on its own 10yd range via IsReady().
+        -- Within ~10yd: lets the seal (a self-buff) go up while closing, so it's ready
+        -- by the time we're in Judgement range. The Judgement step self-gates on its
+        -- own 10yd range via IsReady().
         if context.target_range and context.target_range > 10 then return false end
-        -- Skip if Judgement of the Crusader is already on the target — including when
+        -- Skip if the chosen Judgement is already on the target — including when
         -- ANOTHER paladin applied it. HasDeBuffs with no caster arg matches any source
         -- (framework uses the "HARMFUL PLAYER" filter only when a caster is passed).
         -- Crusader Strike refreshes the debuff for the rest of the fight.
-        if (Unit(TARGET_UNIT):HasDeBuffs(Constants.DEBUFF_ID.JUDGEMENT_CRUSADER) or 0) > 0 then
+        if (Unit(TARGET_UNIT):HasDeBuffs(opt.debuff) or 0) > 0 then
             return false
         end
         -- Don't start the opener unless Judgement is off cooldown, so the
-        -- Seal of the Crusader -> Judge pair completes immediately. Otherwise we'd
-        -- cast the seal, fail to judge it, get it overwritten by Prep-SoC, and
-        -- re-cast it in a loop — i.e. get stuck on the opener.
+        -- Seal -> Judge pair completes immediately. Otherwise we'd cast the seal,
+        -- fail to judge it, get it overwritten by Prep-SoC, and re-cast it in a
+        -- loop — i.e. get stuck on the opener.
         if state.judgement_cd_remaining and state.judgement_cd_remaining > 0 then return false end
         return true
     end,
 
     execute = function(icon, context, state)
-        -- Step 1 (on-GCD): get Seal of the Crusader up. Skipped while on GCD since
+        local opt = OPENER_JUDGE[context.settings.ret_opener_judge]
+        if not opt then return nil end
+        -- Step 1 (on-GCD): get the matching seal up. Skipped while on GCD since
         -- IsReady() is false for a GCD spell mid-GCD.
-        if not context.seal_crusader_active then
-            if A.SealOfCrusader:IsReady(PLAYER_UNIT) then
-                return A.SealOfCrusader:Show(icon), "[RET] Opener: Seal of the Crusader"
+        if not context[opt.seal_flag] then
+            if opt.seal:IsReady(PLAYER_UNIT) then
+                return opt.seal:Show(icon), opt.seal_log
             end
             return nil
         end
-        -- Step 2 (off-GCD): Judge to apply Judgement of the Crusader (+3% raid crit).
+        -- Step 2 (off-GCD): Judge to apply the chosen Judgement debuff.
         if A.Judgement:IsReady(TARGET_UNIT) then
-            return A.Judgement:Show(icon), "[RET] Opener: Judge Crusader (+3% raid crit)"
+            return A.Judgement:Show(icon), opt.judge_log
         end
         return nil
     end,

@@ -257,6 +257,38 @@ rotation_registry:register_middleware({
 })
 
 -- ============================================================================
+-- AUTO FREEDOM (Self — break roots/snares)
+-- ============================================================================
+-- Blessing of Freedom clears movement-impairing effects (roots + snares) only.
+-- It does NOT break stuns, fears, polymorph or silences, so we gate on the
+-- framework's Rooted/Slowed debuff categories rather than the broad InCC() helper
+-- (which also matches stuns/fears BoF can't touch). Not is_defensive-tagged: we
+-- don't want /flux def burning BoF when we aren't actually impaired.
+rotation_registry:register_middleware({
+    name = "Paladin_AutoFreedom",
+    priority = 250,
+
+    matches = function(context)
+        if not context.settings.use_auto_freedom then return false end
+        -- Already free — don't reapply.
+        if (Unit(PLAYER_UNIT):HasBuffs(A.BlessingOfFreedom.ID) or 0) > 0 then return false end
+        -- Fire only when movement-impaired (everything BoF can actually clear).
+        if (Unit(PLAYER_UNIT):HasDeBuffs("Rooted") or 0) <= 0
+           and (Unit(PLAYER_UNIT):HasDeBuffs("Slowed") or 0) <= 0 then
+            return false
+        end
+        return true
+    end,
+
+    execute = function(icon, context)
+        if A.BlessingOfFreedom:IsReady(PLAYER_UNIT) then
+            return A.BlessingOfFreedom:Show(icon), "[MW] Blessing of Freedom (movement impaired)"
+        end
+        return nil
+    end,
+})
+
+-- ============================================================================
 -- SELF-BUFF: AURA (Out of combat)
 -- ============================================================================
 rotation_registry:register_middleware({

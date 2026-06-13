@@ -40,6 +40,8 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
               tooltip = "Automatically Cleanse poison, disease, and magic (if talented) from yourself." },
             { type = "checkbox", key = "use_hammer_of_justice", default = false, label = "Hammer of Justice",
               tooltip = "Use Hammer of Justice to interrupt enemy casts (stun, may break CC)." },
+            { type = "checkbox", key = "use_auto_freedom", default = false, label = "Auto Freedom",
+              tooltip = "Cast Blessing of Freedom on yourself when rooted or snared. Removes movement-impairing effects only — does NOT break stuns, fears, or polymorph." },
         }},
         { header = "Cooldown Management", settings = {
             { type = "slider", key = "cd_min_ttd", default = 0, min = 0, max = 60, label = "CD Min TTD (sec)",
@@ -67,8 +69,14 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
     -- Tab 2: Retribution
     [2] = { name = "Retribution", sections = {
         { header = "Opener", settings = {
-            { type = "checkbox", key = "ret_opener_crusader", default = true, label = "Heart of the Crusader Opener",
-              tooltip = "On pull, cast Seal of the Crusader then Judge it to apply the +3% crit debuff (Heart of the Crusader) for the raid. Crusader Strike refreshes it for the rest of the fight." },
+            { type = "dropdown", key = "ret_opener_judge", default = "crusader", label = "Opener Judgement",
+              tooltip = "On pull, put up the matching Seal then Judge it to seed a Judgement debuff on the target. Crusader Strike refreshes ALL judgements, so this single application stays up the whole fight. Crusader = +3% raid crit (Heart of the Crusader); Wisdom = attacks restore mana; Light = attacks restore health.",
+              options = {
+                  { value = "off", text = "Off" },
+                  { value = "crusader", text = "Crusader (+3% Crit)" },
+                  { value = "wisdom", text = "Wisdom (Mana)" },
+                  { value = "light", text = "Light (Healing)" },
+              }},
         }},
         { header = "Seal Twisting", settings = {
             { type = "checkbox", key = "ret_seal_twist", default = true, label = "Seal Twist",

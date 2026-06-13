@@ -84,6 +84,7 @@ Action[A.PlayerClass] = {
     DivineShield     = Create({ Type = "Spell", ID = 642, Click = { unit = "player", type = "spell", spell = 642 } }),
     DivineProtection = Create({ Type = "Spell", ID = 5573, Click = { unit = "player", type = "spell", spell = 5573 } }),
     BlessingOfProtection = Create({ Type = "Spell", ID = 1022, useMaxRank = true }),
+    BlessingOfFreedom = Create({ Type = "Spell", ID = 1044, Click = { unit = "player", type = "spell", spell = 1044 } }),  -- self-cast; clears roots/snares
     HammerOfJustice  = Create({ Type = "Spell", ID = 853, useMaxRank = true }),          -- 6s stun
 
     -- Utility
