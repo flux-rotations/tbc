@@ -101,13 +101,11 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
         }},
         { header = "AoE", settings = {
             { type = "slider", key = "shadow_aoe_count", default = 4, min = 2, max = 8, label = "AoE Target Count",
-              tooltip = "Spread DoTs on multiple targets when this many enemies in combat.", format = "%d" },
-            { type = "checkbox", key = "shadow_dot_spread", default = true, label = "Enable DoT Spreading",
-              tooltip = "Spread SW:P and VT to nearby enemies during AoE." },
-            { type = "slider", key = "shadow_swp_spread_max", default = 8, min = 1, max = 15, label = "Max SW:P Targets",
-              tooltip = "Maximum number of enemies to spread SW:P on.", format = "%d" },
-            { type = "slider", key = "shadow_vt_spread_max", default = 5, min = 1, max = 15, label = "Max VT Targets",
-              tooltip = "Maximum number of enemies to spread VT on.", format = "%d" },
+              tooltip = "Enemy count at which to maintain Vampiric Embrace for AoE (raid healing from Shadow damage).", format = "%d" },
+            { type = "checkbox", key = "shadow_dot_spread", default = true, label = "DoT Spread on Mouseover",
+              tooltip = "When you hover an enemy missing your SW:P/VT, suggest the DoT so it lands on that mob. Requires 'Use @mouseover' below." },
+            { type = "checkbox", key = "mouseover", default = false, label = "Use @mouseover",
+              tooltip = "Cast on the unit under your cursor when hovering an enemy (standard @mouseover targeting). Required for DoT spreading. Note: while hovering an enemy, ALL harm casts redirect to it — move your cursor off to resume on your target." },
         }},
         { header = "Execute Phase", settings = {
             { type = "slider", key = "shadow_execute_ttd", default = 10, min = 5, max = 15, label = "Execute TTD (sec)",

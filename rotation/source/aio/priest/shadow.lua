@@ -27,8 +27,7 @@ local try_cast_fmt = NS.try_cast_fmt
 local named = NS.named
 
 local Player = NS.Player
-local MultiUnits = A.MultiUnits
-local UnitExists = _G.UnitExists
+local IsUnitEnemy = A.IsUnitEnemy
 
 local GetTime = _G.GetTime
 
@@ -139,25 +138,6 @@ local function get_dot_remaining(unitID, dot_key)
    return remaining > 0 and remaining or 0
 end
 
--- AoE spread rate limiting
-local AOE_GCD_GUARD = 1.6
-local last_aoe_swp_show = 0
-local last_aoe_vt_show = 0
-
--- Pre-allocated Click table for AoE targeting (avoids inline table creation in combat)
--- Set .unit before Show() to cast on a specific nameplate unit instead of current target
-local aoe_click = { unit = nil }
-
--- Cast a spell on a specific nameplate unit by temporarily setting its Click handler
-local function cast_on_nameplate(spell, icon, unitID)
-   local original_click = spell.Click
-   aoe_click.unit = unitID
-   spell.Click = aoe_click
-   local result = spell:Show(icon)
-   spell.Click = original_click
-   return result
-end
-
 -- ============================================================================
 -- SHADOW STATE (per-frame cache)
 -- ============================================================================
@@ -264,100 +244,65 @@ rotation_registry:register("shadow", {
       end,
    }),
 
-   -- [3] AoE SW:P Spread (blanket enemies with SW:P)
-   named("AoESWPSpread", {
+   -- [3] Mouseover SW:P Spread — apply SW:P to the enemy under your cursor.
+   -- The engine has no API to cast on nameplate units (Action.lua: "nameplate ...
+   -- haven't API, passed as no unit"), so the only reliable multi-dot path is the
+   -- framework's [@mouseover,harm] macro, enabled by the "Use @mouseover" toggle.
+   -- safe_ability_cast just Shows the spell; the macro routes the cast to mouseover.
+   -- The "mouseover" arg below only drives the IsReady range/validity check.
+   named("MouseoverSWP", {
       matches = function(context, state)
          if not context.in_combat then
             return false
          end
-         if not context.settings.shadow_dot_spread then
+         if not context.settings.shadow_dot_spread or not context.settings.mouseover then
             return false
          end
-         if context.enemy_count < (context.settings.shadow_aoe_count or 4) then
+         if not IsUnitEnemy("mouseover") or Unit("mouseover"):IsDead() then
             return false
          end
-         -- Don't flip targets during GCD from previous SWP
-         if GetTime() - last_aoe_swp_show < AOE_GCD_GUARD then
+         -- Skip dying mobs (need 2 ticks = 6s of value)
+         local ttd = Unit("mouseover"):TimeToDie() or 0
+         if ttd > 0 and ttd < 6 then
+            return false
+         end
+         -- Already carries a healthy SW:P from us
+         if get_dot_remaining("mouseover", "swp") > DOT_REFRESH_WINDOW then
             return false
          end
          return true
       end,
       execute = function(icon, context, state)
-         local max_targets = context.settings.shadow_swp_spread_max or 8
-         local plates = MultiUnits:GetActiveUnitPlates()
-         for unitID in pairs(plates) do
-            if UnitExists(unitID) and not Unit(unitID):IsDead() then
-               local unit_ttd = Unit(unitID):TimeToDie() or 0
-               local survives = unit_ttd == 0 or unit_ttd >= 6
-               local cc_remaining = Unit(unitID):InCC() or 0
-               if not survives or cc_remaining > 0 or Unit(unitID):CombatTime() == 0 then
-                  -- skip dying, CC'd, or out-of-combat mobs
-               else
-                  local swp_remaining = get_dot_remaining(unitID, "swp")
-                  if swp_remaining > DOT_REFRESH_WINDOW then
-                     max_targets = max_targets - 1
-                  elseif max_targets > 0 and A.ShadowWordPain:IsReady(unitID) then
-                     local result = cast_on_nameplate(A.ShadowWordPain, icon, unitID)
-                     if result then
-                        last_aoe_swp_show = GetTime()
-                        return result, ("[SHADOW] AoE SW:P on %s"):format(unitID)
-                     end
-                  end
-               end
-               if max_targets <= 0 then return nil end
-            end
-         end
-         return nil
+         return try_cast(A.ShadowWordPain, icon, "mouseover", "[SHADOW] Mouseover SW:P")
       end,
    }),
 
-   -- [4] AoE VT Spread (blanket enemies with VT)
-   named("AoEVTSpread", {
+   -- [4] Mouseover VT Spread (1.5s cast) — same mouseover routing as [3].
+   named("MouseoverVT", {
       matches = function(context, state)
          if not context.in_combat then
             return false
          end
-         if not context.settings.shadow_dot_spread then
+         if not context.settings.shadow_dot_spread or not context.settings.mouseover then
             return false
          end
          if context.is_moving then
             return false
          end
-         if context.enemy_count < (context.settings.shadow_aoe_count or 4) then
+         if not IsUnitEnemy("mouseover") or Unit("mouseover"):IsDead() then
             return false
          end
-         -- VT is a 1.5s cast — don't flip targets mid-cast
-         if GetTime() - last_aoe_vt_show < 2.0 then
+         local ttd = Unit("mouseover"):TimeToDie() or 0
+         if ttd > 0 and ttd < 6 then
+            return false
+         end
+         if get_dot_remaining("mouseover", "vt") > DOT_REFRESH_WINDOW then
             return false
          end
          return true
       end,
       execute = function(icon, context, state)
-         local max_targets = context.settings.shadow_vt_spread_max or 5
-         local plates = MultiUnits:GetActiveUnitPlates()
-         for unitID in pairs(plates) do
-            if UnitExists(unitID) and not Unit(unitID):IsDead() then
-               local unit_ttd = Unit(unitID):TimeToDie() or 0
-               local survives = unit_ttd == 0 or unit_ttd >= 6
-               local cc_remaining = Unit(unitID):InCC() or 0
-               if not survives or cc_remaining > 0 or Unit(unitID):CombatTime() == 0 then
-                  -- skip dying, CC'd, or out-of-combat mobs
-               else
-                  local vt_remaining = get_dot_remaining(unitID, "vt")
-                  if vt_remaining > DOT_REFRESH_WINDOW then
-                     max_targets = max_targets - 1
-                  elseif max_targets > 0 and A.VampiricTouch:IsReady(unitID) then
-                     local result = cast_on_nameplate(A.VampiricTouch, icon, unitID)
-                     if result then
-                        last_aoe_vt_show = GetTime()
-                        return result, ("[SHADOW] AoE VT on %s"):format(unitID)
-                     end
-                  end
-               end
-               if max_targets <= 0 then return nil end
-            end
-         end
-         return nil
+         return try_cast(A.VampiricTouch, icon, "mouseover", "[SHADOW] Mouseover VT")
       end,
    }),
 
