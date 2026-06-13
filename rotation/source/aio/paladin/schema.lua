@@ -40,6 +40,8 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
               tooltip = "Automatically Cleanse poison, disease, and magic (if talented) from yourself." },
             { type = "checkbox", key = "use_hammer_of_justice", default = false, label = "Hammer of Justice",
               tooltip = "Use Hammer of Justice to interrupt enemy casts (stun, may break CC)." },
+            { type = "checkbox", key = "use_auto_freedom", default = false, label = "Auto Freedom",
+              tooltip = "Cast Blessing of Freedom on yourself when rooted or snared. Removes movement-impairing effects only — does NOT break stuns, fears, or polymorph." },
         }},
         { header = "Cooldown Management", settings = {
             { type = "slider", key = "cd_min_ttd", default = 0, min = 0, max = 60, label = "CD Min TTD (sec)",
