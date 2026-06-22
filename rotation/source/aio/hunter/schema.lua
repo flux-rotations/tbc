@@ -27,7 +27,7 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
     -- Tab 1: General
     [1] = { name = "General", sections = {
         { header = "Targeting", settings = {
-            { type = "checkbox", key = "mouseover", default = true, label = "Use @mouseover",
+            { type = "checkbox", key = "mouseover", default = false, label = "Use @mouseover",
               tooltip = "Check mouseover target before current target." },
             { type = "checkbox", key = "aoe", default = true, label = "Enable AoE",
               tooltip = "Enable multi-target abilities (Multi-Shot, Explosive Trap)." },
@@ -39,11 +39,11 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
         { header = "Recovery Items", settings = {
             { type = "slider", key = "healthstone_hp", default = 40, min = 0, max = 100, label = "Healthstone HP (%)",
               tooltip = "Use Healthstone when HP drops below this. Set to 0 to disable.", format = "%d%%" },
-            { type = "checkbox", key = "use_healing_potion", default = true, label = "Use Healing Potion",
+            { type = "checkbox", key = "use_healing_potion", default = false, label = "Use Healing Potion",
               tooltip = "Use Healing Potion when HP drops low in combat." },
             { type = "slider", key = "healing_potion_hp", default = 35, min = 0, max = 100, label = "Healing Potion HP (%)",
               tooltip = "Use Healing Potion when HP drops below this.", format = "%d%%" },
-            { type = "checkbox", key = "use_mana_rune", default = true, label = "Use Mana Rune",
+            { type = "checkbox", key = "use_mana_rune", default = false, label = "Use Mana Rune",
               tooltip = "Use Dark/Demonic Rune when mana is low." },
             { type = "slider", key = "mana_rune_mana", default = 20, min = 0, max = 100, label = "Mana Rune Mana (%)",
               tooltip = "Use Dark/Demonic Rune when mana drops below this.", format = "%d%%" },
@@ -56,15 +56,15 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
     -- Tab 2: Rotation
     [2] = { name = "Rotation", sections = {
         { header = "Adaptive Engine", settings = {
-            { type = "checkbox", key = "inhouse_swingshot", default = false, label = "In-House SwingShot",
+            { type = "checkbox", key = "inhouse_swingshot", default = true, label = "In-House SwingShot",
               tooltip = "Use Flux's own Auto Shot clock for Adaptive DPS. Falls back to Action's GetSwingShoot() while unsynced." },
-            { type = "slider", key = "adaptive_exec_pad_ms", default = 100, min = 0, max = 250, label = "Adaptive Cast Pad (ms)",
+            { type = "slider", key = "adaptive_exec_pad_ms", default = 16, min = 0, max = 250, label = "Adaptive Cast Pad (ms)",
               tooltip = "Safety time added to Adaptive's cast-vs-auto clip check. Raise if logs show borderline recommendations clipping; lower if Adaptive waits too much.", format = "%d ms" },
-            { type = "slider_decimal", key = "weapon_speed", default = 2.9, min = 1.5, max = 4, precision = 1, label = "Weapon Speed (sec)",
+            { type = "slider_decimal", key = "weapon_speed", default = 3, min = 1.5, max = 4, precision = 1, label = "Weapon Speed (sec)",
               tooltip = "Your ranged weapon speed (e.g. 2.8, 2.9, 3.0). Used by Adaptive DPS for the haste multiplier. Set this to your unbuffed bow/gun/crossbow speed." },
         }},
         { header = "Arcane Shot", settings = {
-            { type = "checkbox", key = "use_arcane", default = false, label = "Use Arcane Shot",
+            { type = "checkbox", key = "use_arcane", default = true, label = "Use Arcane Shot",
               tooltip = "Weave Arcane Shot into rotation (mana-intensive)." },
             { type = "slider", key = "arcane_shot_mana", default = 15, min = 0, max = 100, label = "Arcane Shot Min Mana (%)",
               tooltip = "Only use Arcane Shot above this mana %.", format = "%d%%" },
@@ -80,15 +80,15 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
         { header = "Hunter's Mark", settings = {
             { type = "checkbox", key = "static_mark", default = true, label = "Static Mark",
               tooltip = "Don't switch Hunter's Mark target until it expires." },
-            { type = "checkbox", key = "boss_mark", default = false, label = "Boss Only Mark",
+            { type = "checkbox", key = "boss_mark", default = true, label = "Boss Only Mark",
               tooltip = "Only apply Hunter's Mark on boss targets." },
-            { type = "slider", key = "mark_refresh", default = 0, min = 0, max = 15, label = "Mark Refresh Lead (sec)",
+            { type = "slider", key = "mark_refresh", default = 3, min = 0, max = 15, label = "Mark Refresh Lead (sec)",
               tooltip = "Re-cast Hunter's Mark this many seconds before it expires so the built-up attack power isn't lost when it drops. 0 = only re-apply after it fully falls off.", format = "%d sec" },
         }},
         { header = "Traps & Aggro", settings = {
-            { type = "checkbox", key = "freezing_trap_pve", default = true, label = "Freezing Trap on Adds",
+            { type = "checkbox", key = "freezing_trap_pve", default = false, label = "Freezing Trap on Adds",
               tooltip = "Drop Freezing Trap when multiple enemies are on you." },
-            { type = "checkbox", key = "protect_freeze", default = true, label = "Protect Frozen Target",
+            { type = "checkbox", key = "protect_freeze", default = false, label = "Protect Frozen Target",
               tooltip = "Auto-switch target away from frozen enemies." },
             { type = "checkbox", key = "concussive_shot_pve", default = true, label = "Concussive Shot (PvE)",
               tooltip = "Use Concussive Shot to slow mobs running at you." },
@@ -96,7 +96,7 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
               tooltip = "Use Intimidation stun on aggro swap." },
             { type = "checkbox", key = "use_feign_death", default = false, label = "Feign Death (Threat)",
               tooltip = "Auto Feign Death when you have aggro on your target." },
-            { type = "checkbox", key = "use_wing_clip", default = true, label = "Wing Clip (Melee)",
+            { type = "checkbox", key = "use_wing_clip", default = false, label = "Wing Clip (Melee)",
               tooltip = "Auto-cast Wing Clip on melee targets. HP thresholds and bosses are still honored. Turn off to never auto-suggest Wing Clip." },
         }},
     }},
@@ -114,14 +114,14 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
               tooltip = "Use racial DPS cooldown during burst." },
         }},
         { header = "Trinkets", settings = {
-            { type = "dropdown", key = "trinket1_mode", default = "off", label = "Trinket 1",
+            { type = "dropdown", key = "trinket1_mode", default = "offensive", label = "Trinket 1",
               tooltip = "Off = never use. Offensive = fires during burst. Defensive = fires during def.",
               options = {
                   { value = "off", text = "Off" },
                   { value = "offensive", text = "Offensive (Burst)" },
                   { value = "defensive", text = "Defensive" },
               }},
-            { type = "dropdown", key = "trinket2_mode", default = "off", label = "Trinket 2",
+            { type = "dropdown", key = "trinket2_mode", default = "offensive", label = "Trinket 2",
               tooltip = "Off = never use. Offensive = fires during burst. Defensive = fires during def.",
               options = {
                   { value = "off", text = "Off" },
@@ -144,7 +144,7 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
         { header = "Aspect Management", settings = {
             { type = "checkbox", key = "aspect_hawk", default = true, label = "Aspect of the Hawk",
               tooltip = "Auto-switch to Hawk in combat." },
-            { type = "checkbox", key = "aspect_cheetah", default = true, label = "Aspect of the Cheetah",
+            { type = "checkbox", key = "aspect_cheetah", default = false, label = "Aspect of the Cheetah",
               tooltip = "Auto-switch to Cheetah out of combat." },
             { type = "checkbox", key = "aspect_viper", default = true, label = "Aspect of the Viper",
               tooltip = "Auto-switch to Viper when mana is low." },
@@ -154,7 +154,7 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
               tooltip = "Switch to Viper when mana drops below this.", format = "%d%%" },
             { type = "slider", key = "mana_viper_end", default = 30, min = 0, max = 100, label = "Viper Off Mana (%)",
               tooltip = "Switch off Viper when mana rises above this.", format = "%d%%" },
-            { type = "slider", key = "mana_save", default = 30, min = 0, max = 100, label = "Mana Save (%)",
+            { type = "slider", key = "mana_save", default = 15, min = 0, max = 100, label = "Mana Save (%)",
               tooltip = "Don't spend mana on expensive shots (Multi-Shot, Arcane Shot, Stings) below this %. Steady Shot always fires.", format = "%d%%" },
         }},
     }},
@@ -194,7 +194,7 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
     -- Tab 5: Pet & Diagnostics
     [5] = { name = "Pet & Diag", sections = {
         { header = "Pet Care", settings = {
-            { type = "slider", key = "mend_pet_hp", default = 30, min = 0, max = 100, label = "Mend Pet HP (%)",
+            { type = "slider", key = "mend_pet_hp", default = 60, min = 0, max = 100, label = "Mend Pet HP (%)",
               tooltip = "Heal pet when HP drops below this.", format = "%d%%" },
             { type = "checkbox", key = "experimental_pet", default = false, label = "Experimental Pet Controller",
               tooltip = "Auto pet-attack controller (experimental)." },
@@ -204,7 +204,7 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
               tooltip = "Track auto shot clipping events." },
             { type = "checkbox", key = "show_clip_tracker", default = false, label = "Show Clip Tracker UI",
               tooltip = "Show/hide the clip tracker window." },
-            { type = "checkbox", key = "clip_print_summary", default = true, label = "Print Combat Summary",
+            { type = "checkbox", key = "clip_print_summary", default = false, label = "Print Combat Summary",
               tooltip = "Print clip summary to chat after combat." },
         }},
         { header = "Clip Severity Thresholds (ms)", settings = {
@@ -218,10 +218,16 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
         { header = "Melee Weave Coach", settings = {
             { type = "checkbox", key = "show_melee_weave_coach", default = false, label = "Show Melee Weave Coach",
               tooltip = "Show a read-only traffic-light timer for manual Raptor Strike melee weaving." },
-            { type = "slider", key = "weave_round_trip_ms", default = 900, min = 300, max = 2200, label = "Round Trip Budget (ms)",
+            { type = "slider", key = "weave_round_trip_ms", default = 384, min = 300, max = 2200, label = "Round Trip Budget (ms)",
               tooltip = "Estimated time to enter melee, queue/land Raptor, and return to ranged distance. Lower for large hitboxes.", format = "%d ms" },
-            { type = "slider", key = "weave_exit_buffer_ms", default = 300, min = 0, max = 1000, label = "Exit Safety Buffer (ms)",
+            { type = "slider", key = "weave_exit_buffer_ms", default = 234, min = 0, max = 1000, label = "Exit Safety Buffer (ms)",
               tooltip = "Extra time reserved before ranged Auto Shot windup begins. Raise this if orange/red feels late.", format = "%d ms" },
+            { type = "slider", key = "weave_stepin_lead_ms", default = 150, min = 0, max = 600, label = "Step-In Lead (ms)",
+              tooltip = "Your forward-step travel time. STEP IN lights green only when your melee swing lands within this lead (plus live latency), so the swing connects as you arrive. Also sets the width of the green GO window.", format = "%d ms" },
+            { type = "slider", key = "weave_hud_width", default = 320, min = 320, max = 760, label = "Weave HUD Width (px)",
+              tooltip = "Width of the weave helper bar overlay.", format = "%d px" },
+            { type = "checkbox", key = "weave_manual_melee", default = true, label = "Manual Melee Control",
+              tooltip = "Enable if you've turned OFF WoW's 'Auto Attack / Auto Shot' swap. Flux will start your melee auto-attack the moment you enter melee, so Raptor Strike's on-next-swing has a white swing to fire on. Leave off if the WoW setting is on." },
         }},
         { header = "Debug Panel", settings = {
             { type = "checkbox", key = "show_debug_panel", default = false, label = "Show Debug Panel",

@@ -55,6 +55,23 @@ local next_pet_attack_at = 0
 local next_start_attack_at = 0
 local next_hunter_trace_at = 0
 
+-- GGL v1 Readiness keybind workaround.
+-- Under the v1 framework the engine doesn't recognize the Readiness icon as a
+-- bindable rotation action, so the player can't map a key to it. Painting a
+-- distinct, known texture (Inv_misc_bag_felclothbag, 133667) on the main-rotation
+-- slot [3/4] gives a stable visual the player binds their Readiness key against.
+-- The MetaEngine recognizes Readiness natively, so there we show the real action
+-- untouched. Gate on the *selected* framework so MetaEngine users are never
+-- affected; GetToggle(9,"Framework") returns "v1" or "MetaEngine" (default
+-- "MetaEngine") and the check fails safe to the real icon if the toggle is absent.
+local READINESS_V1_TEXTURE = 133667
+local function ShowReadiness(icon)
+    if A.GetToggle(9, "Framework") == "v1" then
+        return A:Show(icon, READINESS_V1_TEXTURE)
+    end
+    return A.Readiness:Show(icon)
+end
+
 local function BurnPhaseActive()
     return Unit(PLAYER_UNIT):HasBuffs(A.Heroism.ID) > 0
         or Unit(PLAYER_UNIT):HasBuffs(A.Bloodlust.ID) > 0
@@ -310,14 +327,19 @@ strategies[#strategies + 1] = named("CombatRotation", {
             -- [R-4] Readiness controller (outside burst)
             if s.use_readiness and A.Readiness:IsReady(PLAYER_UNIT) then
                 if s.readiness_rapid_fire and ttd_ok then
-                    local rkRank = (A.RapidKilling1.GetTalentRank and A.RapidKilling1:GetTalentRank()) or 0
-                    if A.RapidFire:GetCooldown() >= 300 - (60 * rkRank) then
-                        return A.Readiness:Show(icon), "[RANGED] Readiness (Rapid Fire)"
+                    -- Pair Readiness with the re-cast RF: only fire once the RF buff has
+                    -- dropped (see [R-15]) so its GCD lands next to the 2nd RF, not while RF
+                    -- is still up. The old gate required RF's CD to be ~full (just cast),
+                    -- which can never coincide with the buff being down ~15s later -- so the
+                    -- buff gate replaces it: fire whenever RF is still meaningfully on CD.
+                    if A.RapidFire:GetCooldown() >= 60
+                       and Unit(PLAYER_UNIT):HasBuffs(A.RapidFire.ID, true) == 0 then
+                        return ShowReadiness(icon), "[RANGED] Readiness (Rapid Fire)"
                     end
                 end
                 if s.readiness_misdirection then
                     if A.Misdirection:GetCooldown() >= 10 then
-                        return A.Readiness:Show(icon), "[RANGED] Readiness (Misdirection)"
+                        return ShowReadiness(icon), "[RANGED] Readiness (Misdirection)"
                     end
                 end
             end
@@ -362,11 +384,14 @@ strategies[#strategies + 1] = named("CombatRotation", {
                 end
             end
 
-            -- [R-10] Kill Command is off-GCD, but the single-key clicker can only
-            -- fire one icon per press. Prefer real GCD shots when the GCD is open;
-            -- show KC while locked out or as a fallback below.
-            local gcdRemainingForKC = GetCurrentGCD() or 0
-            if not shouldMeleeRecover and ttd_ok and gcdRemainingForKC > 0.05 and A.KillCommand:IsReady(unit) then
+            -- [R-10] Kill Command is off-GCD, so firing it in a cast gap costs nothing:
+            -- the clicker presses KC, then the next GCD shot on the following read-cycle
+            -- -- both land inside the ~1s gap between casts. The old gate only showed KC
+            -- while the GCD was LOCKED, which is exactly when a Steady is mid-cast and KC
+            -- can't fire; it stopped painting KC the instant the open GCD (the gap it's
+            -- actually castable in) arrived. Fire ASAP when ready and let IsReady gate
+            -- castability. KC isn't a GCD shot, so it never enters the auto-shot clip math.
+            if not shouldMeleeRecover and ttd_ok and A.KillCommand:IsReady(unit) then
                 return A.KillCommand:Show(icon), "[RANGED] Kill Command"
             end
 
@@ -385,6 +410,14 @@ strategies[#strategies + 1] = named("CombatRotation", {
             -- when intentionally weaving in.
             if is_force_active and is_force_active("force_raptor") and RaptorQueueReady(unit)
                 and (inMeleeRange == true or (targetRange > 0 and targetRange <= 7)) then
+                -- Manual melee control: if we're truly in melee but the white swing
+                -- isn't running yet (WoW Auto Attack/Auto Shot swap off), start it FIRST
+                -- so the forced Raptor has a swing to fire on instead of whiffing.
+                if s.weave_manual_melee and A.StartAttack and inMeleeRange == true
+                   and not Player:IsAttacking() and ShouldStartMeleeAttack() then
+                    HunterTrace(context, unit, "return_startattack_manual_force", atRange, inMeleeRange)
+                    return A.StartAttack:Show(icon), "[WEAVE] Start Attack (manual force)"
+                end
                 HunterTrace(context, unit, "return_manual_raptor_queue", atRange, inMeleeRange)
                 return (A.RaptorStrikeQueue or A.RaptorStrike):Show(icon), "[WEAVE] Manual Raptor Queue"
             end
@@ -446,14 +479,20 @@ strategies[#strategies + 1] = named("CombatRotation", {
                     end
 
                     if ttd_ok and A.Readiness:IsReady(PLAYER_UNIT) and s.use_readiness then
+                        -- Fire Readiness only once the RF buff has dropped, so it pairs with
+                        -- the re-cast Rapid Fire instead of burning its ~1s GCD in the opener.
+                        -- RF's buff is 15s and you can't re-RF until it expires, so resetting
+                        -- the CD earlier just makes Readiness's GCD delay your haste CDs for
+                        -- nothing. Matches the top-parse pattern: RF -> ~15s -> Readiness -> RF.
                         if s.readiness_rapid_fire then
-                            if A.RapidFire:GetCooldown() >= 60 then
-                                return A.Readiness:Show(icon), "[BURST] Readiness (Rapid Fire)"
+                            if A.RapidFire:GetCooldown() >= 60
+                               and Unit(PLAYER_UNIT):HasBuffs(A.RapidFire.ID, true) == 0 then
+                                return ShowReadiness(icon), "[BURST] Readiness (Rapid Fire)"
                             end
                         end
                         if s.readiness_misdirection then
                             if A.Misdirection:GetCooldown() > 30 then
-                                return A.Readiness:Show(icon), "[BURST] Readiness (Misdirection)"
+                                return ShowReadiness(icon), "[BURST] Readiness (Misdirection)"
                             end
                         end
                     end
@@ -553,9 +592,25 @@ strategies[#strategies + 1] = named("CombatRotation", {
             if shouldMeleeRecover then
                 HunterTrace(context, unit, "melee_branch", atRange, inMeleeRange)
 
-                -- [R-18] Explosive Trap (AoE in melee)
-                if A.ExplosiveTrap:IsReady(unit) and MultiUnits:GetByRange(5, 3) > 2 and s.aoe then
-                    return A.ExplosiveTrap:Show(icon), "[MELEE] Explosive Trap"
+                -- [R-18] Explosive Trap (AoE in melee) -- DISABLED.
+                -- Auto-dropping Explosive Trap breaks CC (its ~20s fire DoT keeps
+                -- breaking Freezing Trap / sleeps on nearby adds), and it conflicts
+                -- with the rotation's own auto Freezing Trap on adds. Queue it manually
+                -- via GGL's queue (forces it to the top of the rotation and drops it)
+                -- instead of auto-casting here.
+                -- if A.ExplosiveTrap:IsReady(unit) and MultiUnits:GetByRange(5, 3) > 2 and s.aoe then
+                --     return A.ExplosiveTrap:Show(icon), "[MELEE] Explosive Trap"
+                -- end
+
+                -- [R-18.5] Manual melee control. With WoW's "Auto Attack / Auto Shot"
+                -- swap disabled, the melee white swing does NOT auto-engage when you
+                -- enter melee, so Raptor (on-next-swing) has nothing to fire on. Start
+                -- the swing FIRST -- before any Raptor queue below -- so Raptor lands on
+                -- the next pass. Opt-in; off = unchanged upstream behaviour.
+                if s.weave_manual_melee and A.StartAttack and not Player:IsAttacking()
+                   and ShouldStartMeleeAttack() then
+                    HunterTrace(context, unit, "return_startattack_manual", atRange, inMeleeRange)
+                    return A.StartAttack:Show(icon), "[MELEE] Start Attack (manual)"
                 end
 
                 -- [R-19] Raptor Strike queue for deliberate melee weaving
