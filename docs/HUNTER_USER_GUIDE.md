@@ -63,7 +63,7 @@ All toggled in **Pet & Diag** (or `/flux`):
 
 | Tool | What it shows |
 |---|---|
-| **Melee Weave Coach** | Read-only traffic-light timer for manually weaving **Raptor Strike** into Auto Shot downtime. Tunable: Round Trip Budget *(384ms)*, Exit Buffer *(234ms)*, Step-In Lead *(150ms)*, HUD Width *(320px)*. Enable **Manual Melee Control** only if you turned OFF WoW's "Auto Attack / Auto Shot" swap (full macro setup in §6). |
+| **Melee Weave Coach** | Read-only traffic-light timer for manually weaving **Raptor Strike** into Auto Shot downtime. Tunable: Round Trip Budget *(384ms)*, Exit Buffer *(234ms)*, Step-In Lead *(150ms)*, HUD Width *(320px)*. **Manual Melee Control** is **on by default** — turn it OFF if you still use WoW's "Auto Attack / Auto Shot" swap (full macro setup in §6). |
 | **Auto Shot Clip Tracker** | Tracks and color-codes how badly you're clipping Auto Shot; optional post-combat summary. Green/Yellow/Orange/Red ms thresholds. |
 | **Debug Panel** | Live hunter state — range band, swing/shoot timers, pet, context. |
 | **Adaptive Engine Panel** | Per-tick Adaptive scores, derived stats, and recent fires (why it chose each shot). |
@@ -117,9 +117,10 @@ tuned weave defaults assume.
 
 1. **Disable WoW's "Auto Attack / Auto Shot"** (Interface → Combat options). With it on, WoW
    auto-swaps between melee and Auto Shot by range and will fight your weave.
-2. **Enable Manual Melee Control** (`weave_manual_melee`, in Pet & Diag → Melee Weave Coach). With
-   the swap off, this makes Flux start your melee swing the moment you reach melee, so Raptor's
-   on-next-swing has a white hit to land on.
+2. **Confirm Manual Melee Control is on** (`weave_manual_melee`, Pet & Diag → Melee Weave Coach —
+   it's on by default). With WoW's swap off, this makes Flux start your melee swing the moment you
+   reach melee, so Raptor's on-next-swing has a white hit to land on. *(If you do **not** weave,
+   turn this off so it doesn't interfere with normal Auto Shot.)*
 3. **Make a mouse macro that presses _forward_ then _back_** — e.g. if forward is `W` and back is
    `S`, the macro taps `W` → `S`. How you build it depends on your mouse/keyboard software
    (Corsair iCUE, Razer Synapse, Logitech G HUB, …) — search a tutorial for your specific brand.
@@ -127,10 +128,10 @@ tuned weave defaults assume.
    more wiggle room for positioning); the *back* hold has to cover the same distance at the slower
    backpedal speed:
 
-   - **No boots speed enchant:** `back = forward / 0.64`
-   - **With a Minor Speed boots enchant:** `back = (1.08 × forward) / 0.64`
+   `back = forward / 0.64` — backpedal runs at ~0.64× your forward speed. (A Minor Speed boots
+   enchant speeds both directions equally, so the ratio is unchanged — no adjustment needed.)
 
-   *Example (no enchant):* hold forward `0.096s` → hold back `0.096 / 0.64 = 0.15s`.
+   *Example:* hold forward `0.096s` → hold back `0.096 / 0.64 = 0.15s`.
 
    Fire the macro on the coach's **GREEN**. These hold times map to the coach's **Step-In Lead**
    (forward) and **Round Trip Budget** (forward + back) — the shipped defaults *(150 / 384 ms)*
