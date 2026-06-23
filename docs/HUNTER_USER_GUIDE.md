@@ -23,33 +23,34 @@ to your unbuffed bow/gun/crossbow speed — it's the single most important numbe
 
 ## 2. Hunter settings worth knowing
 
-(Defaults in parentheses. Stings and Arcane are **off** by default — turn on what your spec uses.)
+(Defaults in parentheses — these ship as the profile defaults. Stings are **off** by default;
+turn on what your spec uses.)
 
 **Shot priority**
-- **Weapon Speed** *(2.9)* — your unbuffed ranged speed. Drives the Adaptive haste math. Set this first.
-- **Use Arcane Shot** *(off)* + min mana % — weave Arcane when mana allows.
+- **Weapon Speed** *(3.0)* — your unbuffed ranged speed. Drives the Adaptive haste math. Set this first.
+- **Use Arcane Shot** *(on)*, **Min Mana** *(15%)* — weave Arcane when mana allows.
 - **Sting Selection** *(all off)* — Serpent Sting (DoT, top sting), Scorpid Sting (boss only), Viper Sting (PvE mana drain). Listed in priority order.
-- **Mana Save %** *(30)* — below this, skip expensive shots (Multi, Arcane, stings); Steady always fires.
+- **Mana Save %** *(15)* — below this, skip expensive shots (Multi, Arcane, stings); Steady always fires.
 
 **Hunter's Mark**
 - **Static Mark** *(on)* — don't re-mark a new target until the mark expires.
-- **Boss Only Mark** *(off)*, **Mark Refresh Lead** *(0s)* — re-mark this many seconds before it drops so the ramped AP isn't lost.
+- **Boss Only Mark** *(on)*, **Mark Refresh Lead** *(3s)* — re-mark this many seconds before it drops so the ramped AP isn't lost.
 
 **Aspects** (auto-swap)
-- **Hawk** *(on, in combat)*, **Cheetah** *(on, out of combat)*, **Viper** *(on, low mana)* with **Viper On/Off %** thresholds.
+- **Hawk** *(on, in combat)*, **Cheetah** *(off)*, **Viper** *(on, low mana)* with **Viper On/Off %** thresholds *(on below 10%, off above 30%)*.
 
 **Traps & aggro**
-- **Freezing Trap on Adds** *(on)*, **Protect Frozen Target** *(on)*, **Concussive Shot (PvE)** *(on)*, **Intimidation (PvE)** *(on)*, **Feign Death (Threat)** *(off)*, **Wing Clip (Melee)** *(on)*.
+- **Freezing Trap on Adds** *(off)*, **Protect Frozen Target** *(off)*, **Concussive Shot (PvE)** *(on)*, **Intimidation (PvE)** *(on)*, **Feign Death (Threat)** *(off)*, **Wing Clip (Melee)** *(off)*.
 - *Explosive Trap auto-cast is disabled* — queue it through GGL when you want it (it would break CC otherwise).
 
 **Cooldowns**
 - **Bestial Wrath / Rapid Fire / Readiness / Racial** toggles.
 - **Readiness Target** — Reset Rapid Fire *(on)*, Reset Misdirection *(off)*: what Readiness waits to reset before firing.
-- **Trinket 1/2** — Off / Offensive (burst) / Defensive.
+- **Trinket 1/2** *(Offensive)* — Off / Offensive (burst) / Defensive.
 - **Sync CDs with Bloodlust/Drums**, **Haste Potion (burst)**.
 
 **Pet**
-- **Mend Pet HP %** *(30)*, **Experimental Pet Controller** *(off)*.
+- **Mend Pet HP %** *(60)*, **Experimental Pet Controller** *(off)*.
 
 **PvP** (own tab)
 - Per-class **Viper Sting** targets + skip-below-HP threshold; **Wing Clip** PvP/PvE HP gates.
@@ -62,7 +63,7 @@ All toggled in **Pet & Diag** (or `/flux`):
 
 | Tool | What it shows |
 |---|---|
-| **Melee Weave Coach** | Read-only traffic-light timer for manually weaving **Raptor Strike** into Auto Shot downtime. Tunable: Round Trip Budget, Exit Buffer, Step-In Lead, HUD Width. Enable **Manual Melee Control** only if you turned OFF WoW's "Auto Attack / Auto Shot" swap. |
+| **Melee Weave Coach** | Read-only traffic-light timer for manually weaving **Raptor Strike** into Auto Shot downtime. Tunable: Round Trip Budget *(384ms)*, Exit Buffer *(234ms)*, Step-In Lead *(150ms)*, HUD Width *(320px)*. Enable **Manual Melee Control** only if you turned OFF WoW's "Auto Attack / Auto Shot" swap (full macro setup in §6). |
 | **Auto Shot Clip Tracker** | Tracks and color-codes how badly you're clipping Auto Shot; optional post-combat summary. Green/Yellow/Orange/Red ms thresholds. |
 | **Debug Panel** | Live hunter state — range band, swing/shoot timers, pet, context. |
 | **Adaptive Engine Panel** | Per-tick Adaptive scores, derived stats, and recent fires (why it chose each shot). |
@@ -81,8 +82,8 @@ in either place means that ability silently no-ops.
 Most of the rotation's abilities come pre-filled in your config; just confirm they mirror the
 in-game Hotkeys tab. Abilities the rotation can output include: Auto Shot, Steady Shot, Arcane
 Shot, Multi-Shot, Kill Command, Raptor Strike, Wing Clip, Concussive Shot, Hunter's Mark,
-Tranquilizing Shot, Rapid Fire, Bestial Wrath, **Readiness** (special — see §5), Intimidation,
-Feign Death, the aspects, Blood Fury (racial), pet control, and runes.
+Tranquilizing Shot, Rapid Fire, Bestial Wrath, **Readiness** (special — see the note below),
+Intimidation, Feign Death, the aspects, Blood Fury (racial), pet control, and runes.
 
 **Currently unbound but the rotation can output them** — assign keys if your spec uses them:
 **Serpent / Scorpid / Viper Sting, Freezing Trap, Silencing Shot (Interrupt), Scatter Shot,
@@ -100,11 +101,40 @@ Trueshot Aura, Misdirection.**
 ## 5. Quick start (v1)
 
 1. Loader: `Framework = v1`. Confirm `[TBC Hunter]` keys mirror your in-game Hotkeys tab.
-2. Bind **Readiness** in-game to whatever key you gave `Universal1` (see the note in §4).
+2. Bind **Readiness** in-game to whatever key you gave `Universal1` (see the Readiness note in §4).
 3. `/flux` → set **Weapon Speed** to your ranged weapon speed.
-4. Turn on the stings / Arcane / aspects you want (stings + Arcane are off by default).
+4. Turn on the stings / Arcane / aspects you want (stings are off by default).
 5. Hold your **Rotation** key and play; call burst with `/flux burst`.
-6. (Optional) Enable the Weave Coach / Clip Tracker if you weave Raptor in melee.
+6. (Optional) Enable the Weave Coach / Clip Tracker if you weave Raptor in melee — full macro setup in §6.
+
+---
+
+## 6. Setting up the melee-weave macro
+
+The Weave Coach (§3) tells you *when* to weave; a **hardware macro** on your mouse or keyboard
+does the actual step-in/step-out so you aren't feathering the keys by hand. This is the setup the
+tuned weave defaults assume.
+
+1. **Disable WoW's "Auto Attack / Auto Shot"** (Interface → Combat options). With it on, WoW
+   auto-swaps between melee and Auto Shot by range and will fight your weave.
+2. **Enable Manual Melee Control** (`weave_manual_melee`, in Pet & Diag → Melee Weave Coach). With
+   the swap off, this makes Flux start your melee swing the moment you reach melee, so Raptor's
+   on-next-swing has a white hit to land on.
+3. **Make a mouse macro that presses _forward_ then _back_** — e.g. if forward is `W` and back is
+   `S`, the macro taps `W` → `S`. How you build it depends on your mouse/keyboard software
+   (Corsair iCUE, Razer Synapse, Logitech G HUB, …) — search a tutorial for your specific brand.
+4. **Tune the hold times.** How long you hold *forward* sets how deep you dip into melee (longer =
+   more wiggle room for positioning); the *back* hold has to cover the same distance at the slower
+   backpedal speed:
+
+   - **No boots speed enchant:** `back = forward / 0.64`
+   - **With a Minor Speed boots enchant:** `back = (1.08 × forward) / 0.64`
+
+   *Example (no enchant):* hold forward `0.096s` → hold back `0.096 / 0.64 = 0.15s`.
+
+   Fire the macro on the coach's **GREEN**. These hold times map to the coach's **Step-In Lead**
+   (forward) and **Round Trip Budget** (forward + back) — the shipped defaults *(150 / 384 ms)*
+   reflect a ~150 ms-in / ~234 ms-out weave.
 
 ---
 
