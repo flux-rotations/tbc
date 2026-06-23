@@ -72,6 +72,19 @@ local function ShowReadiness(icon)
     return A.Readiness:Show(icon)
 end
 
+-- GGL v1 Haste Potion workaround.
+-- Same idea as ShowReadiness: under v1 the sender can't bind the raw item icon,
+-- so paint texture 176108 -- the texture GGL's v1 "Potion" keybind recognizes --
+-- and the player points that Potion bind at their Haste Potion. MetaEngine reads
+-- the real item untouched.
+local HASTE_POTION_V1_TEXTURE = 176108
+local function ShowHastePotion(icon)
+    if A.GetToggle(9, "Framework") == "v1" then
+        return A:Show(icon, HASTE_POTION_V1_TEXTURE)
+    end
+    return A.HastePotion:Show(icon)
+end
+
 local function BurnPhaseActive()
     return Unit(PLAYER_UNIT):HasBuffs(A.Heroism.ID) > 0
         or Unit(PLAYER_UNIT):HasBuffs(A.Bloodlust.ID) > 0
@@ -506,7 +519,7 @@ strategies[#strategies + 1] = named("CombatRotation", {
                     end
 
                     if ttd_ok and s.use_haste_potion and A.HastePotion:IsReady(PLAYER_UNIT) then
-                        return A.HastePotion:Show(icon), "[BURST] Haste Potion"
+                        return ShowHastePotion(icon), "[BURST] Haste Potion"
                     end
 
                     -- Trinkets (legacy Hunter_Goob_opt parity: fire inline on GGL Burst)
