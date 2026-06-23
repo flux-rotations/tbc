@@ -611,9 +611,6 @@ strategies[#strategies + 1] = named("CombatRotation", {
                 -- with the rotation's own auto Freezing Trap on adds. Queue it manually
                 -- via GGL's queue (forces it to the top of the rotation and drops it)
                 -- instead of auto-casting here.
-                -- if A.ExplosiveTrap:IsReady(unit) and MultiUnits:GetByRange(5, 3) > 2 and s.aoe then
-                --     return A.ExplosiveTrap:Show(icon), "[MELEE] Explosive Trap"
-                -- end
 
                 -- [R-18.5] Manual melee control. With WoW's "Auto Attack / Auto Shot"
                 -- swap disabled, the melee white swing does NOT auto-engage when you

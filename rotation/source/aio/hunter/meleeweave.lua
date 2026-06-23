@@ -258,8 +258,8 @@ function Coach:Evaluate(unit)
 
     local shootRemaining = Player and Player.GetSwingShoot and (Player:GetSwingShoot() or 0) or 0
     local rangedSpeed, rangedWindup, haste = getRangedTiming()
-    local exitBuffer = settingSeconds("weave_exit_buffer_ms", 300)
-    local roundTrip = settingSeconds("weave_round_trip_ms", 900)
+    local exitBuffer = settingSeconds("weave_exit_buffer_ms", 234)
+    local roundTrip = settingSeconds("weave_round_trip_ms", 384)
     local rangedDeadline = shootRemaining - rangedWindup - exitBuffer
     local safeWindow = math_max(0, rangedDeadline)
     -- Entry gate uses the window BEFORE exit_buffer. round_trip already covers the
@@ -493,7 +493,7 @@ end
 function Coach:Create()
     if self.Frame then return self.Frame end
 
-    local width = (NS.cached_settings and tonumber(NS.cached_settings.weave_hud_width)) or 550
+    local width = (NS.cached_settings and tonumber(NS.cached_settings.weave_hud_width)) or 320
     local margin = 16
 
     -- borderless: no outer backdrop, the frame is just an invisible movable hit area
@@ -582,7 +582,7 @@ function Coach:Refresh()
     local clipText, clipColor = getLastAutoBadge()
 
     -- live width from the in-game slider; bar restretches automatically
-    local width = (NS.cached_settings and tonumber(NS.cached_settings.weave_hud_width)) or 550
+    local width = (NS.cached_settings and tonumber(NS.cached_settings.weave_hud_width)) or 320
     if math_abs(f:GetWidth() - width) > 0.5 then f:SetWidth(width) end
 
     -- zone cells: light the active one in the state color, dim the rest
