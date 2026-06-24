@@ -5,6 +5,8 @@ local _G, string, math = _G, string, math
 local format = string.format
 local math_max = math.max
 local math_min = math.min
+local math_sin = math.sin
+local math_abs = math.abs
 
 local A = _G.Action
 if not A then return end
@@ -26,6 +28,7 @@ local GetSpellInfo     = _G.GetSpellInfo
 local UnitGUID         = _G.UnitGUID
 local UnitRangedDamage = _G.UnitRangedDamage
 local CombatLogGetCurrentEventInfo = _G.CombatLogGetCurrentEventInfo
+local GetNetStats      = _G.GetNetStats
 local Listener         = A.Listener
 
 local BACKDROP = {
@@ -37,9 +40,7 @@ local BACKDROP = {
 local RAPTOR_NAME = GetSpellInfo and GetSpellInfo(2973) or "Raptor Strike"
 
 local THEME = {
-    bg       = { 0.031, 0.031, 0.039, 0.96 },
     panel    = { 0.059, 0.059, 0.075, 1 },
-    border   = { 0.118, 0.118, 0.149, 1 },
     text     = { 0.90, 0.90, 0.94, 1 },
     dim      = { 0.58, 0.58, 0.66, 1 },
     gray     = { 0.30, 0.32, 0.36, 1 },
@@ -49,22 +50,18 @@ local THEME = {
     red      = { 1.00, 0.18, 0.18, 1 },
 }
 
-local RANGE_STATES = {
-    UNKNOWN = { color = THEME.gray,   label = "range unknown" },
-    IDEAL   = { color = THEME.green,  label = "ideal 5-7yd" },
-    FAR     = { color = THEME.red,    label = "too far 7-10yd" },
-    MELEE   = { color = THEME.red,    label = "melee <5yd" },
-    DEAD    = { color = THEME.red,    label = "deadzone" },
-    RANGED  = { color = THEME.gray,   label = "ranged" },
-    OUT     = { color = THEME.gray,   label = "out of range" },
+local STATES = {
+    GRAY   = { color = THEME.gray },
+    GREEN  = { color = THEME.green },
+    ORANGE = { color = THEME.orange },
+    RED    = { color = THEME.red },
 }
 
-local STATES = {
-    GRAY   = { color = THEME.gray,   title = "HOLD" },
-    GREEN  = { color = THEME.green,  title = "GO" },
-    ORANGE = { color = THEME.orange, title = "OUT" },
-    RED    = { color = THEME.red,    title = "BACK" },
+-- rangeState -> which zone cell (MELEE/IDEAL/FAR) lights up; nil = none lit
+local ZONE_OF = {
+    MELEE = "MELEE", IDEAL = "IDEAL", FAR = "FAR", RANGED = "FAR",
 }
+local ZONE_TEXT_ON = { 0.05, 0.05, 0.06, 1 }
 
 local Coach = {
     Frame = nil,
@@ -122,22 +119,18 @@ end
 local function getMeleeSwingRemaining()
     if not Player then return 0, 0 end
 
-    local now = GetTime()
-    local start = Player.GetSwingStart and Player:GetSwingStart(1) or 0
-    local duration = Player.GetSwing and Player:GetSwing(1) or 0
+    -- Player:GetSwing(slot) already returns the time REMAINING until the next
+    -- swing (Env.SwingDuration = period - elapsed), despite the "duration" name.
+    -- The old code did (start + GetSwing) - now, mis-reading it as a full swing
+    -- duration; with GetSwing as remaining that evaluates to period - 2*elapsed,
+    -- which bottoms out at the swing midpoint. Use the remaining value directly.
+    local remaining = Player.GetSwing and Player:GetSwing(1) or 0
+    if remaining <= 0 or remaining > 10 then remaining = 0 end
 
-    if start and start > 0 and duration and duration > 0 then
-        local remaining = (start + duration) - now
-        if remaining > 0 and remaining <= 10 then
-            return remaining, duration
-        end
-    end
+    local period = Player.GetSwingMax and (Player:GetSwingMax(1) or 0) or 0
+    if period <= 0 then period = remaining end
 
-    if duration and duration > 0 and duration <= 10 then
-        return duration, Player.GetSwingMax and (Player:GetSwingMax(1) or duration) or duration
-    end
-
-    return 0, Player.GetSwingMax and (Player:GetSwingMax(1) or 0) or 0
+    return remaining, period
 end
 
 local function getTargetRange(unit)
@@ -174,37 +167,27 @@ end
 
 local function getRangeState(range, inMelee, atRange, deadzone, farRange)
     if inMelee then
-        return "MELEE", RANGE_STATES.MELEE
+        return "MELEE"
     end
     if deadzone then
-        return "DEAD", RANGE_STATES.DEAD
+        return "DEAD"
     end
     if not range or range <= 0 then
-        return "UNKNOWN", RANGE_STATES.UNKNOWN
+        return "UNKNOWN"
     end
     if range >= 5 and range <= 7 then
-        return "IDEAL", RANGE_STATES.IDEAL
+        return "IDEAL"
     end
     if range > 7 and range <= 10 then
-        return "FAR", RANGE_STATES.FAR
+        return "FAR"
     end
     if farRange then
-        return "OUT", RANGE_STATES.OUT
+        return "OUT"
     end
     if atRange then
-        return "RANGED", RANGE_STATES.RANGED
+        return "RANGED"
     end
-    return "OUT", RANGE_STATES.OUT
-end
-
-local function rangeBudgetMultiplier(rangeState)
-    if rangeState == "IDEAL" then
-        return 0.55
-    end
-    if rangeState == "FAR" then
-        return 0.80
-    end
-    return 1
+    return "OUT"
 end
 
 local function severityColor(severity)
@@ -243,11 +226,6 @@ local function setTextColor(t, color)
     t:SetTextColor(color[1], color[2], color[3], color[4] or 1)
 end
 
-local function setFrameColor(f, color)
-    f:SetBackdropColor(color[1], color[2], color[3], 0.94)
-    f:SetBackdropBorderColor(color[1], color[2], color[3], 1)
-end
-
 function Coach:MarkRaptorPending(now, meleeRemaining)
     now = now or GetTime()
     local hold = math_max(0.45, math_min(3, (meleeRemaining or 0) + 0.35))
@@ -276,15 +254,21 @@ function Coach:Evaluate(unit)
     local deadzone = targetExists and (not atRange) and (not inMelee) and (targetRange <= 0 or targetRange <= 8)
     local farRange = targetExists and (not atRange) and (not inMelee) and targetRange > 8
     local rangeBucket = getRangeBucket(targetRange, inMelee, atRange, deadzone)
-    local rangeState, rangeInfo = getRangeState(targetRange, inMelee, atRange, deadzone, farRange)
+    local rangeState = getRangeState(targetRange, inMelee, atRange, deadzone, farRange)
 
     local shootRemaining = Player and Player.GetSwingShoot and (Player:GetSwingShoot() or 0) or 0
     local rangedSpeed, rangedWindup, haste = getRangedTiming()
-    local exitBuffer = settingSeconds("weave_exit_buffer_ms", 300)
-    local roundTrip = settingSeconds("weave_round_trip_ms", 900)
+    local exitBuffer = settingSeconds("weave_exit_buffer_ms", 234)
+    local roundTrip = settingSeconds("weave_round_trip_ms", 384)
     local rangedDeadline = shootRemaining - rangedWindup - exitBuffer
     local safeWindow = math_max(0, rangedDeadline)
-    local requiredWindow = roundTrip * rangeBudgetMultiplier(rangeState)
+    -- Entry gate uses the window BEFORE exit_buffer. round_trip already covers the
+    -- full in+out macro trip, so subtracting exit_buffer here too would double-book
+    -- the walk-out. exit_buffer is only the back-out (stuck-in-melee) reserve.
+    local entryWindow = math_max(0, shootRemaining - rangedWindup)
+    -- round_trip is a fixed, measured macro runtime (step in + step out), so it does
+    -- NOT scale with range -- the iCUE weave takes the same time at 5yd or 7yd.
+    local requiredWindow = roundTrip
     local warningWindow = requiredWindow * 0.55
 
     local raptorCD = cooldownRemaining(HA.RaptorStrike)
@@ -293,6 +277,18 @@ function Coach:Evaluate(unit)
     local meleeRemaining, meleeDuration = getMeleeSwingRemaining()
     local shooting = Player and Player.IsShooting and Player:IsShooting() or false
     local recentRaptorPrompt = self.LastRaptorPromptAt and (now - self.LastRaptorPromptAt) <= 1.2
+
+    -- Step-in lead = your forward-step travel time + live world latency. STEP IN
+    -- only lights when the white swing will tick within this lead, so it lands as
+    -- you arrive in melee. swingKnown gates it: if the melee swing clock is not
+    -- live at range, fall back to the gap-only GO IN behaviour.
+    local swingKnown = meleeRemaining and meleeRemaining > 0
+    local worldLatency = 0
+    if GetNetStats then
+        local _, _, _, w = GetNetStats()
+        worldLatency = (tonumber(w) or 0) / 1000
+    end
+    local stepInLead = settingSeconds("weave_stepin_lead_ms", 150) + worldLatency
 
     if inMelee and raptorQueued then
         self:MarkRaptorPending(now, meleeRemaining)
@@ -363,11 +359,17 @@ function Coach:Evaluate(unit)
             state = "RED"
             action = "CLOSER"
             reason = "Need 5-7yd"
-        elseif safeWindow >= requiredWindow then
-            state = "GREEN"
-            action = "GO IN"
-            reason = "Safe weave window"
-        elseif safeWindow >= warningWindow then
+        elseif entryWindow >= requiredWindow then
+            if (not swingKnown) or meleeRemaining <= stepInLead + 0.05 then
+                state = "GREEN"
+                action = "STEP IN"
+                reason = swingKnown and "Swing up - step in" or "Gap open (swing n/a)"
+            else
+                state = "ORANGE"
+                action = "READY"
+                reason = "Gap open, swing soon"
+            end
+        elseif entryWindow >= warningWindow then
             state = "ORANGE"
             action = "READY"
             reason = "Window soon"
@@ -395,12 +397,60 @@ function Coach:Evaluate(unit)
         ringLabel = "Raptor cooldown"
     end
 
+    -- ============================================================
+    -- HUD presentation: one fill bar that sweeps out (BUILD) then
+    -- retreats back right->left (WINDOW) then bleeds red (TOO LATE),
+    -- plus a centered countdown and a flash on GO. The green window
+    -- width IS stepInLead, so the in-game lead slider tunes true<->padded.
+    -- ============================================================
+    local reactFloor = math_max(worldLatency, 0.06)         -- below this you can't arrive in time
+    local buildHorizon = math_max(stepInLead * 4, 1.0)      -- how early the orange fill starts climbing
+    local barValue, barColor, countText, fire = 0, STATES[state].color, "", false
+
+    if action == "RAPTOR" then
+        barValue, barColor, countText, fire = 1, THEME.green, "now", true
+    elseif action == "WAIT HIT" then
+        local dur = math_max(0.1, meleeDuration or 0.1)
+        barValue = swingKnown and math_min(1, meleeRemaining / dur) or 1
+        barColor = THEME.orange
+        countText = swingKnown and fmtSeconds(meleeRemaining) or "hold"
+    elseif action == "BACK OUT" or action == "MOVE OUT" then
+        barValue = (ringTotal > 0) and math_max(0, math_min(1, ringRemaining / ringTotal)) or 0
+        barColor, countText = THEME.red, "out"
+    elseif state == "GREEN" or (state == "ORANGE" and action == "READY") then
+        if not swingKnown then
+            barValue, barColor, countText, fire = 1, THEME.green, "go", true
+            state, action = "GREEN", "STEP IN"
+        elseif meleeRemaining > stepInLead then            -- BUILD: orange fill climbs left->right
+            local span = math_max(0.01, buildHorizon - stepInLead)
+            barValue = 1 - math_min(1, math_max(0, (meleeRemaining - stepInLead) / span))
+            barColor, countText = THEME.orange, fmtSeconds(meleeRemaining - stepInLead)
+            state, action = "ORANGE", "READY"
+        elseif meleeRemaining > reactFloor then            -- WINDOW: green, retreats right->left
+            barValue = math_max(0, math_min(1, meleeRemaining / math_max(0.01, stepInLead)))
+            barColor, countText, fire = THEME.green, fmtSeconds(meleeRemaining), true
+            state, action = "GREEN", "STEP IN"
+        else                                                -- TOO LATE: red tail
+            barValue = math_max(0, meleeRemaining / reactFloor)
+            barColor, countText = THEME.red, "too late"
+            state, action = "RED", "TOO LATE"
+        end
+    elseif raptorCD > 0.15 and raptorCD < 30 then           -- RAPTOR on cooldown: fill toward ready
+        local maxCD = 6                                     -- Raptor Strike base cooldown
+        barValue = math_max(0, 1 - raptorCD / maxCD)
+        barColor, countText = THEME.gray, fmtSeconds(raptorCD)
+        if state == "GRAY" then action = "RAPTOR CD" end
+    end
+
+    local color = STATES[state].color
+    local zoneLabel = ZONE_OF[rangeState]
+
     self.State = {
         now = now,
         state = state,
         action = action,
         reason = reason,
-        color = STATES[state].color,
+        color = color,
         targetExists = targetExists,
         atRange = atRange,
         inMelee = inMelee,
@@ -409,8 +459,6 @@ function Coach:Evaluate(unit)
         targetRange = targetRange,
         rangeBucket = rangeBucket,
         rangeState = rangeState,
-        rangeColor = rangeInfo.color,
-        rangeLabel = rangeInfo.label,
         shootRemaining = shootRemaining,
         rangedSpeed = rangedSpeed,
         rangedWindup = rangedWindup,
@@ -427,9 +475,16 @@ function Coach:Evaluate(unit)
         raptorPending = raptorPending,
         meleeRemaining = meleeRemaining,
         meleeDuration = meleeDuration,
+        swingKnown = swingKnown,
+        stepInLead = stepInLead,
         ringTotal = ringTotal,
         ringRemaining = ringRemaining,
         ringLabel = ringLabel,
+        barValue = barValue,
+        barColor = barColor,
+        countText = countText,
+        fire = fire,
+        zoneLabel = zoneLabel,
     }
     self.LastMeleeRemaining = meleeRemaining
     return self.State
@@ -438,12 +493,13 @@ end
 function Coach:Create()
     if self.Frame then return self.Frame end
 
-    local f = CreateFrame("Frame", "HunterMeleeWeaveCoachFrame", UIParent, "BackdropTemplate")
-    f:SetSize(204, 246)
+    local width = (NS.cached_settings and tonumber(NS.cached_settings.weave_hud_width)) or 320
+    local margin = 16
+
+    -- borderless: no outer backdrop, the frame is just an invisible movable hit area
+    local f = CreateFrame("Frame", "HunterMeleeWeaveCoachFrame", UIParent)
+    f:SetSize(width, 128)
     f:SetPoint("CENTER", UIParent, "CENTER", 270, 0)
-    f:SetBackdrop(BACKDROP)
-    f:SetBackdropColor(THEME.bg[1], THEME.bg[2], THEME.bg[3], THEME.bg[4])
-    f:SetBackdropBorderColor(THEME.border[1], THEME.border[2], THEME.border[3], 1)
     f:SetMovable(true)
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
@@ -454,74 +510,62 @@ function Coach:Create()
 
     local close = CreateFrame("Button", nil, f)
     close:SetSize(16, 16)
-    close:SetPoint("TOPRIGHT", -4, -4)
+    close:SetPoint("TOPRIGHT", -2, -2)
     close.text = close:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     close.text:SetPoint("CENTER")
     close.text:SetText("x")
     setTextColor(close.text, THEME.dim)
     close:SetScript("OnClick", function() f:Hide() end)
 
-    f.rangeBadge = CreateFrame("Frame", nil, f, "BackdropTemplate")
-    f.rangeBadge:SetSize(184, 26)
-    f.rangeBadge:SetPoint("TOP", f, "TOP", 0, -8)
-    f.rangeBadge:SetBackdrop(BACKDROP)
-    setFrameColor(f.rangeBadge, THEME.gray)
+    -- zone cells (MELEE / IDEAL / FAR), centered as a group around IDEAL
+    local function zoneCell(text)
+        local c = CreateFrame("Frame", nil, f, "BackdropTemplate")
+        c:SetSize(72, 20)
+        c:SetBackdrop(BACKDROP)
+        c.t = c:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        c.t:SetPoint("CENTER")
+        c.t:SetText(text)
+        return c
+    end
+    f.zoneIdeal = zoneCell("IDEAL")
+    f.zoneIdeal:SetPoint("TOP", f, "TOP", 0, -8)
+    f.zoneMelee = zoneCell("MELEE")
+    f.zoneMelee:SetPoint("RIGHT", f.zoneIdeal, "LEFT", -5, 0)
+    f.zoneFar = zoneCell("FAR")
+    f.zoneFar:SetPoint("LEFT", f.zoneIdeal, "RIGHT", 5, 0)
+    f.zones = { MELEE = f.zoneMelee, IDEAL = f.zoneIdeal, FAR = f.zoneFar }
 
-    f.rangeText = f.rangeBadge:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    f.rangeText:SetPoint("CENTER")
-    f.rangeText:SetText("RANGE ?")
-    setTextColor(f.rangeText, THEME.text)
-
-    f.light = CreateFrame("Frame", nil, f, "BackdropTemplate")
-    f.light:SetSize(144, 144)
-    f.light:SetPoint("TOP", f.rangeBadge, "BOTTOM", 0, -7)
-    f.light:SetBackdrop(BACKDROP)
-    setFrameColor(f.light, THEME.gray)
-
-    f.cooldown = CreateFrame("Cooldown", nil, f.light, "CooldownFrameTemplate")
-    f.cooldown:SetAllPoints(f.light)
-    if f.cooldown.SetReverse then f.cooldown:SetReverse(true) end
-    if f.cooldown.SetDrawEdge then f.cooldown:SetDrawEdge(false) end
-    if f.cooldown.SetDrawBling then f.cooldown:SetDrawBling(false) end
-    if f.cooldown.SetDrawSwipe then f.cooldown:SetDrawSwipe(true) end
-
-    f.big = f.light:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    f.big:SetPoint("CENTER", f.light, "CENTER", 0, 18)
-    f.big:SetScale(1.8)
-    f.big:SetText("HOLD")
-    setTextColor(f.big, THEME.text)
-
-    f.action = f.light:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    f.action:SetPoint("TOP", f.big, "BOTTOM", 0, -4)
-    f.action:SetText("HOLD RANGE")
+    -- big centered action word
+    f.action = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    f.action:SetPoint("TOP", f.zoneIdeal, "BOTTOM", 0, -10)
+    f.action:SetScale(1.7)
+    f.action:SetText("HOLD")
     setTextColor(f.action, THEME.text)
 
-    f.timer = f.light:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    f.timer:SetPoint("TOP", f.action, "BOTTOM", 0, -6)
-    f.timer:SetText("0.00s")
-    setTextColor(f.timer, THEME.text)
-
+    -- hero fill bar: anchored to both sides so it stretches with the frame width
     f.bar = CreateFrame("StatusBar", nil, f)
-    f.bar:SetSize(184, 8)
-    f.bar:SetPoint("TOP", f.light, "BOTTOM", 0, -8)
+    f.bar:SetPoint("TOP", f.action, "BOTTOM", 0, -12)
+    f.bar:SetPoint("LEFT", f, "LEFT", margin, 0)
+    f.bar:SetPoint("RIGHT", f, "RIGHT", -margin, 0)
+    f.bar:SetHeight(22)
     f.bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
     f.bar:SetMinMaxValues(0, 1)
     f.bar:SetValue(0)
 
     f.barBg = f.bar:CreateTexture(nil, "BACKGROUND")
     f.barBg:SetAllPoints(f.bar)
-    f.barBg:SetColorTexture(0, 0, 0, 0.65)
+    f.barBg:SetColorTexture(1, 1, 1, 0.06)
 
-    f.clipBadge = CreateFrame("Frame", nil, f, "BackdropTemplate")
-    f.clipBadge:SetSize(184, 24)
-    f.clipBadge:SetPoint("TOP", f.bar, "BOTTOM", 0, -7)
-    f.clipBadge:SetBackdrop(BACKDROP)
-    setFrameColor(f.clipBadge, THEME.gray)
+    f.count = f.bar:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    f.count:SetPoint("CENTER", f.bar, "CENTER", 0, 0)
+    f.count:SetText("")
+    setTextColor(f.count, THEME.text)
 
-    f.clipText = f.clipBadge:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    f.clipText:SetPoint("CENTER")
+    -- AUTO CLEAN feedback, centered under the bar
+    f.clipText = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    f.clipText:SetPoint("TOP", f.bar, "BOTTOM", 0, -8)
     f.clipText:SetText("AUTO --")
-    setTextColor(f.clipText, THEME.text)
+    setTextColor(f.clipText, THEME.dim)
 
     self.Frame = f
     return f
@@ -533,35 +577,43 @@ function Coach:Refresh()
 
     local d = self:Evaluate("target")
     local f = self.Frame
-    local st = STATES[d.state] or STATES.GRAY
     local color = d.color or THEME.gray
-    local rangeColor = d.rangeColor or THEME.gray
+    local barColor = d.barColor or color
     local clipText, clipColor = getLastAutoBadge()
 
-    setFrameColor(f.light, color)
-    setFrameColor(f.rangeBadge, rangeColor)
-    setFrameColor(f.clipBadge, clipColor)
-    f.big:SetText(st.title)
-    f.action:SetText(d.action)
-    f.timer:SetText(fmtSeconds(d.ringRemaining))
-    f.rangeText:SetText(format("%.1f YD  %s", d.targetRange or 0, d.rangeLabel or "range unknown"))
-    f.clipText:SetText(clipText)
+    -- live width from the in-game slider; bar restretches automatically
+    local width = (NS.cached_settings and tonumber(NS.cached_settings.weave_hud_width)) or 320
+    if math_abs(f:GetWidth() - width) > 0.5 then f:SetWidth(width) end
 
-    f.bar:SetMinMaxValues(0, d.ringTotal or 1)
-    f.bar:SetValue(d.ringRemaining or 0)
-    f.bar:SetStatusBarColor(color[1], color[2], color[3], 1)
-
-    if f.cooldown then
-        if d.ringRemaining and d.ringRemaining > 0 and d.ringTotal and d.ringTotal > 0 then
-            local start = GetTime() - ((d.ringTotal or 0) - (d.ringRemaining or 0))
-            f.cooldown:SetCooldown(start, d.ringTotal)
+    -- zone cells: light the active one in the state color, dim the rest
+    for label, cell in pairs(f.zones) do
+        if label == d.zoneLabel then
+            cell:SetBackdropColor(color[1], color[2], color[3], 0.95)
+            cell:SetBackdropBorderColor(color[1], color[2], color[3], 1)
+            setTextColor(cell.t, ZONE_TEXT_ON)
         else
-            f.cooldown:SetCooldown(0, 0)
-        end
-        if f.cooldown.SetSwipeColor then
-            f.cooldown:SetSwipeColor(0, 0, 0, 0.42)
+            cell:SetBackdropColor(0.10, 0.11, 0.13, 0.5)
+            cell:SetBackdropBorderColor(0, 0, 0, 0)
+            setTextColor(cell.t, THEME.dim)
         end
     end
+
+    -- action word (arrows bracket it when it's a GO moment)
+    f.action:SetText(d.fire and (">  " .. d.action .. "  <") or d.action)
+    setTextColor(f.action, color)
+
+    -- fill bar + flash on GO
+    local r, g, b = barColor[1], barColor[2], barColor[3]
+    if d.fire then
+        local k = 0.25 + 0.25 * math_sin(GetTime() * 9)
+        r = r + (1 - r) * k; g = g + (1 - g) * k; b = b + (1 - b) * k
+    end
+    f.bar:SetValue(d.barValue or 0)
+    f.bar:SetStatusBarColor(r, g, b, 1)
+
+    f.count:SetText(d.countText or "")
+    f.clipText:SetText(clipText)
+    setTextColor(f.clipText, clipColor)
 end
 
 function Coach:Show()

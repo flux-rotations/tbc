@@ -146,7 +146,11 @@ Action[A.PlayerClass] = {
         ID = 6603,
         FixedTexture = 132333,
         Desc = "Start Melee Attack",
-        Click = { autounit = "harm", type = "spell", spell = 6603, macrobefore = "/stopcasting\n/startattack\n" },
+        -- /stopattack breaks Auto Shot (which /stopcasting does NOT) so the melee
+        -- swing engages with WoW's Auto Attack/Auto Shot swap off. Safe here because
+        -- Start Attack only fires when not already swinging (guarded in rotation.lua),
+        -- so it runs once on weave-in and never resets an in-progress melee swing.
+        Click = { autounit = "harm", type = "spell", spell = 6603, macrobefore = "/stopcasting\n/stopattack\n/startattack\n" },
     }),
 
     -- Pet Attack
@@ -396,7 +400,7 @@ A.ShouldUseViperSting = ShouldUseViperSting
 -- ============================================================================
 rotation_registry:register_class({
     name = "Hunter",
-    version = "v1.8.0",
+    version = "v1.9.0",
     playstyles = { "ranged" },
     idle_playstyle_name = nil,
 
