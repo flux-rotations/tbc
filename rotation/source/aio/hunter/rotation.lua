@@ -91,15 +91,18 @@ local function BurnPhaseActive()
         or Unit(PLAYER_UNIT):HasBuffs(A.Drums.ID) > 0
 end
 
-local function BurstWindowOpen(unit, settings)
+local function BurstWindowOpen(unit, settings, context)
     local force_burst_on = is_force_active and is_force_active("force_burst")
+    local auto_burst = context and NS.should_auto_burst(context)
     local autoSyncCDs = settings.auto_sync_cds
 
-    if not (force_burst_on or BurstIsON(unit) or (not BurstIsON(unit) and autoSyncCDs)) then
+    if force_burst_on or auto_burst == true then return true end
+
+    if not (BurstIsON(unit) or (not BurstIsON(unit) and autoSyncCDs)) then
         return false
     end
 
-    return force_burst_on or (autoSyncCDs and BurnPhaseActive()) or not autoSyncCDs
+    return (autoSyncCDs and BurnPhaseActive()) or not autoSyncCDs
 end
 
 local function PetNeedsAttack(unit)
@@ -482,7 +485,7 @@ strategies[#strategies + 1] = named("CombatRotation", {
 
                 -- [R-15] Burst Cooldowns
                 local useAoE = s.aoe
-                if BurstWindowOpen(unit, s) then
+                if BurstWindowOpen(unit, s, context) then
                     if ttd_ok and A.BestialWrath:IsReady(PLAYER_UNIT) and s.use_bestial_wrath and context.pet_active then
                         return A.BestialWrath:Show(icon), "[BURST] Bestial Wrath"
                     end
