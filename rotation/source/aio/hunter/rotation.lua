@@ -47,6 +47,8 @@ local UnitExists = _G.UnitExists
 local UnitIsDeadOrGhost = _G.UnitIsDeadOrGhost
 local UnitGUID = _G.UnitGUID
 local GetNumGroupMembers = _G.GetNumGroupMembers
+local GetNumPartyMembers = _G.GetNumPartyMembers
+local GetNumRaidMembers = _G.GetNumRaidMembers
 local GetTime = _G.GetTime
 
 local PLAYER_UNIT = "player"
@@ -166,6 +168,147 @@ local function HunterTrace(context, unit, reason, atRange, inMeleeRange)
         tostring(raptorReady),
         tostring(raptorCurrent)
     ))
+end
+
+-- ============================================================================
+-- THREAT THROTTLE HELPERS
+-- ============================================================================
+-- Threat-based DPS throttle (opt-in). Pushes DPS to a threat ceiling, then dumps
+-- with Feign Death (FD's 30s CD wipes threat, so in steady state it's back up by
+-- the time threat rebuilds -> full DPS between Feigns). Only when FD is on cooldown
+-- AT the ceiling does it hold to Auto Shot only -- the rare fallback. Threat is
+-- read relative to whoever's tanking (party tank OR your pet), so it works
+-- solo+pet. TBC 2.4.3 has no native threat API; this only does anything on a
+-- server that exposes UnitDetailedThreatSituation / UnitThreatSituation (the same
+-- API the Druid Bear rotation already uses). Where it's absent, the feature no-ops.
+
+local function InGroup()
+    if GetNumRaidMembers and GetNumRaidMembers() > 0 then return true end
+    if GetNumPartyMembers and GetNumPartyMembers() > 0 then return true end
+    if GetNumGroupMembers and GetNumGroupMembers() > 0 then return true end
+    return false
+end
+
+-- Aggro pulls at ~130% of the tank's threat at range but only ~110% in melee.
+-- The killer case: sitting at e.g. 115 (safe at range, < 130) and then stepping
+-- into melee to weave -> you're instantly past the 110 melee pull -> one-shot.
+-- An in-melee-only clamp reacts a frame too late: the pull happens ON the step,
+-- before in_melee_range flips. So when Weave-Safe is on we hold threat under the
+-- MELEE pull point AT ALL TIMES (range included), dumping before you can ever be
+-- caught high on a step-in. Sits ~20 under 110 because the pull actually triggers
+-- when you perform a threat action in melee (your Raptor weave) -- a single big
+-- Steady plus one stale threat read can overshoot a thinner margin before Feign
+-- fires. No-op for conservative settings and for a retail-style scaled API (whose
+-- value caps at 100, already range-correct).
+-- Default for the "Melee Safety Cap" slider (threat_melee_ceiling); fallback if unloaded.
+local MELEE_THREAT_CEILING = 90
+
+-- Min threat (dashboard %) before we bother Feigning ahead of a Readiness cast.
+-- Default for the "FD before Readiness Above" slider (threat_fd_readiness_pct).
+local FD_READINESS_THREAT_PCT = 30
+
+-- Live threat read vs `unit`, shared by the throttle and the pre-Readiness FD
+-- check. Returns (pct, near_pull, have_data):
+--   pct       = the threat % the dashboard bar shows (0..~130; 100 if pulled)
+--   near_pull = true once we're the primary target (isTanking)
+--   have_data = false when the server has no threat API / we're not on the table
+-- Read LIVE from _G (never load-captured): the API is server-provided (or could be
+-- injected by an addon that loads after us). Mirrors Druid Bear's live read. The
+-- detailed API's 3rd return is the threat % vs the tank -- retail caps it at 100
+-- (=pull); on THIS server it climbs toward ~130 for ranged before you pull (the
+-- dashboard threat bar scales to 130), so thresholds are tuned against that number.
+local function ReadThreatPct(unit)
+    local detailed = _G.UnitDetailedThreatSituation
+    if detailed then
+        local isTanking, status, scaledPct = detailed(PLAYER_UNIT, unit)
+        if status == nil then return 0, false, false end   -- not on threat table
+        return scaledPct or (isTanking and 100) or 0, (isTanking and true or false), true
+    end
+    -- Degraded: status-only API (0=safe, 1=over tank, 2/3=tanking). No %, so we
+    -- only know "at/over the tank" (treat as 100 / near-pull) vs not.
+    local simple = _G.UnitThreatSituation
+    if simple then
+        local status = simple(PLAYER_UNIT, unit)
+        if status == nil then return 0, false, false end
+        if status >= 1 then return 100, true, true end
+        return 0, false, true
+    end
+    return 0, false, false                                  -- no threat API on this server
+end
+
+-- Decide what the threat throttle should do against `unit` this frame:
+--   "fd"   -> Feign Death now (it's up): proactive dump above the FD-on-CD floor,
+--             OR emergency dump near/at the pull.
+--   "hold" -> near/at the pull but FD is down: Auto-Shot-only so we don't pull.
+--   nil    -> nothing to do (below the floor, or no threat data) -> full DPS.
+--
+-- Two thresholds, both read against the same live % the dashboard threat bar
+-- shows (see below): threat_fd_cooldown_pct (the main lever -- Feign on cooldown
+-- to KEEP threat low) and threat_hold_pct (the backstop -- when FD is down, stop
+-- specials before the pull). Weave-Safe caps the backstop to the melee pull point.
+local function ThreatAction(context, unit)
+    local hold_at = context.settings.threat_hold_pct or 95
+
+    -- Weave-Safe: hold under the melee pull point even at range, so a step-in
+    -- can't insta-pull. (Without it, only clamp once we're actually in melee.)
+    -- Fail safe -- treat an unloaded setting as weave-safe rather than open.
+    local melee_cap = context.settings.threat_melee_ceiling or MELEE_THREAT_CEILING
+    local weave_safe = context.settings.threat_weave_safe
+    if weave_safe == nil then weave_safe = true end
+    if (weave_safe or context.in_melee_range) and hold_at > melee_cap then
+        hold_at = melee_cap
+    end
+
+    local fd_at = context.settings.threat_fd_cooldown_pct or 60
+    if fd_at > hold_at then fd_at = hold_at end        -- keep the floor at/under the backstop
+
+    local pct, near_pull, have_data = ReadThreatPct(unit)
+    if not have_data then return nil end               -- no threat API / not on table
+
+    -- No real threat, or below the proactive floor and not near the pull -> run DPS.
+    if not near_pull and (pct <= 0 or pct < fd_at) then return nil end
+
+    -- Feign Death readiness (cooldown + per-NPC exclusion list).
+    local fd_ready = A.FeignDeath:IsReady(PLAYER_UNIT)
+    if fd_ready then
+        local npcID = select(6, Unit(unit):InfoGUID())
+        if NS.NO_FEIGN and NS.NO_FEIGN[npcID] then fd_ready = false end
+    end
+
+    -- Near/at the pull: FD if we can, else hold specials to avoid pulling.
+    if near_pull or pct >= hold_at then
+        return fd_ready and "fd" or "hold"
+    end
+
+    -- Proactive band (>= floor, below the backstop): Feign ON COOLDOWN to keep
+    -- threat low. If FD is down here we're still well clear of the pull, so full DPS.
+    return fd_ready and "fd" or nil
+end
+
+-- "Feign Death before Readiness": Readiness resets ALL hunter cooldowns, so if we
+-- Feign the frame BEFORE Readiness, the FD is free (Readiness hands it right back)
+-- and it wipes our threat to ~0 -- so the post-Readiness burst climbs from a clean
+-- slate. Only worth it when we already hold real threat (> FD_READINESS_THREAT_PCT)
+-- and FD is actually up. True => show FD this frame instead of Readiness.
+local function FDBeforeReadiness(context, unit)
+    if not context.settings.fd_before_readiness then return false end
+    if not A.FeignDeath:IsReady(PLAYER_UNIT) then return false end     -- FD on CD -> can't pre-cast
+    local npcID = select(6, Unit(unit):InfoGUID())
+    if NS.NO_FEIGN and NS.NO_FEIGN[npcID] then return false end        -- excluded NPC
+    local floor = context.settings.threat_fd_readiness_pct or FD_READINESS_THREAT_PCT
+    local pct, _, have_data = ReadThreatPct(unit)
+    if not have_data or pct <= floor then return false end
+    return true
+end
+
+-- Wraps a Readiness cast: Feign Death first when FDBeforeReadiness applies,
+-- otherwise show Readiness (honoring the GGL v1 keybind texture). One frame later
+-- FD is on cooldown, so this falls through and Readiness proceeds (resetting FD).
+local function ShowReadinessStep(icon, context, log)
+    if FDBeforeReadiness(context, TARGET_UNIT) then
+        return A.FeignDeath:Show(icon), "[THREAT] Feign Death (pre-Readiness)"
+    end
+    return ShowReadiness(icon), log
 end
 
 -- ============================================================================
@@ -290,6 +433,48 @@ strategies[#strategies + 1] = named("OOC_RevivePet", {
 })
 
 -- ============================================================================
+-- THREAT THROTTLE (optional: Feign on cooldown to keep threat low; hold near pull)
+-- ============================================================================
+-- Sits just above the combat rotation: Interrupt still wins, but when threat is
+-- being managed this short-circuits CombatRotation (Feign Death, or auto-only if
+-- FD is down near the pull). Only the current target's threat is considered (not
+-- mouseover); active whenever a pet or group can hold the mob.
+strategies[#strategies + 1] = named("ThreatThrottle", {
+    requires_combat = true,
+    requires_enemy = true,
+    setting_key = "threat_throttle_enabled",
+    -- Feign Death is off-GCD: evaluate even during the GCD so the threat dump
+    -- isn't delayed ~1.5s after a Steady Shot -- exactly the mid-weave moment we
+    -- must react in. The auto-only/PoolResource fallbacks are display-only and
+    -- don't consume a GCD, so running them off-GCD is harmless.
+    is_gcd_gated = false,
+
+    matches = function(context)
+        -- Need something else that can hold the mob: a live pet or a group.
+        if not (context.pet_active or InGroup()) then return false end
+        if not IsUnitEnemy(TARGET_UNIT) then return false end
+        return ThreatAction(context, TARGET_UNIT) ~= nil
+    end,
+
+    execute = function(icon, context)
+        local action = ThreatAction(context, TARGET_UNIT)
+
+        -- Feign Death: proactive dump above the FD-on-cooldown floor (keeps threat
+        -- low so you rarely approach the pull), or emergency dump at/over the pull.
+        if action == "fd" then
+            return A.FeignDeath:Show(icon), "[THREAT] Feign Death"
+        end
+
+        -- action == "hold": near/at the pull but FD is down -- Auto Shot only until
+        -- FD returns or threat drops, so we don't pull.
+        if not Player:IsShooting() then
+            return A:Show(icon, CONST.AUTOSHOOT), "[THREAT] Auto Shot only (FD down)"
+        end
+        return A.PoolResource:Show(icon), "[THREAT] Holding specials (FD down)"
+    end,
+})
+
+-- ============================================================================
 -- 6. COMBAT ROTATION (the full EnemyRotation as one strategy)
 -- ============================================================================
 strategies[#strategies + 1] = named("CombatRotation", {
@@ -350,12 +535,12 @@ strategies[#strategies + 1] = named("CombatRotation", {
                     -- buff gate replaces it: fire whenever RF is still meaningfully on CD.
                     if A.RapidFire:GetCooldown() >= 60
                        and Unit(PLAYER_UNIT):HasBuffs(A.RapidFire.ID, true) == 0 then
-                        return ShowReadiness(icon), "[RANGED] Readiness (Rapid Fire)"
+                        return ShowReadinessStep(icon, context, "[RANGED] Readiness (Rapid Fire)")
                     end
                 end
                 if s.readiness_misdirection then
                     if A.Misdirection:GetCooldown() >= 10 then
-                        return ShowReadiness(icon), "[RANGED] Readiness (Misdirection)"
+                        return ShowReadinessStep(icon, context, "[RANGED] Readiness (Misdirection)")
                     end
                 end
             end
@@ -503,12 +688,12 @@ strategies[#strategies + 1] = named("CombatRotation", {
                         if s.readiness_rapid_fire then
                             if A.RapidFire:GetCooldown() >= 60
                                and Unit(PLAYER_UNIT):HasBuffs(A.RapidFire.ID, true) == 0 then
-                                return ShowReadiness(icon), "[BURST] Readiness (Rapid Fire)"
+                                return ShowReadinessStep(icon, context, "[BURST] Readiness (Rapid Fire)")
                             end
                         end
                         if s.readiness_misdirection then
                             if A.Misdirection:GetCooldown() > 30 then
-                                return ShowReadiness(icon), "[BURST] Readiness (Misdirection)"
+                                return ShowReadinessStep(icon, context, "[BURST] Readiness (Misdirection)")
                             end
                         end
                     end
