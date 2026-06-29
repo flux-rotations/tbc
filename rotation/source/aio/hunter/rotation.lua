@@ -207,11 +207,12 @@ local MELEE_THREAT_CEILING = 90
 -- Default for the "FD before Readiness Above" slider (threat_fd_readiness_pct).
 local FD_READINESS_THREAT_PCT = 30
 
--- Live threat read vs `unit`, shared by the throttle and the pre-Readiness FD
--- check. Returns (pct, near_pull, have_data):
---   pct       = the threat % the dashboard bar shows (0..~130; 100 if pulled)
+-- Live threat read vs `unit`, shared by the throttle, the pre-Readiness FD check,
+-- and the dashboard readout. Returns (pct, near_pull, have_data, raw):
+--   pct       = scaled threat % (3rd API return; the value thresholds tune against)
 --   near_pull = true once we're the primary target (isTanking)
 --   have_data = false when the server has no threat API / we're not on the table
+--   raw       = raw threat % (4th API return; un-scaled, for scaled-vs-raw validation)
 -- Read LIVE from _G (never load-captured): the API is server-provided (or could be
 -- injected by an addon that loads after us). Mirrors Druid Bear's live read. The
 -- detailed API's 3rd return is the threat % vs the tank -- retail caps it at 100
@@ -220,20 +221,20 @@ local FD_READINESS_THREAT_PCT = 30
 local function ReadThreatPct(unit)
     local detailed = _G.UnitDetailedThreatSituation
     if detailed then
-        local isTanking, status, scaledPct = detailed(PLAYER_UNIT, unit)
-        if status == nil then return 0, false, false end   -- not on threat table
-        return scaledPct or (isTanking and 100) or 0, (isTanking and true or false), true
+        local isTanking, status, scaledPct, rawPct = detailed(PLAYER_UNIT, unit)
+        if status == nil then return 0, false, false, 0 end   -- not on threat table
+        return scaledPct or (isTanking and 100) or 0, (isTanking and true or false), true, rawPct or 0
     end
     -- Degraded: status-only API (0=safe, 1=over tank, 2/3=tanking). No %, so we
     -- only know "at/over the tank" (treat as 100 / near-pull) vs not.
     local simple = _G.UnitThreatSituation
     if simple then
         local status = simple(PLAYER_UNIT, unit)
-        if status == nil then return 0, false, false end
-        if status >= 1 then return 100, true, true end
-        return 0, false, true
+        if status == nil then return 0, false, false, 0 end
+        if status >= 1 then return 100, true, true, 100 end
+        return 0, false, true, 0
     end
-    return 0, false, false                                  -- no threat API on this server
+    return 0, false, false, 0                                  -- no threat API on this server
 end
 
 -- Decide what the threat throttle should do against `unit` this frame:
@@ -284,6 +285,9 @@ local function ThreatAction(context, unit)
     -- threat low. If FD is down here we're still well clear of the pull, so full DPS.
     return fd_ready and "fd" or nil
 end
+
+-- Expose the threat read + decision for the dashboard validation readout.
+NS.HunterThreat = { Read = ReadThreatPct, Action = ThreatAction }
 
 -- "Feign Death before Readiness": Readiness resets ALL hunter cooldowns, so if we
 -- Feign the frame BEFORE Readiness, the FD is free (Readiness hands it right back)

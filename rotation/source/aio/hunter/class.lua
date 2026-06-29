@@ -458,6 +458,31 @@ rotation_registry:register_class({
                 if context.pet_active then return "Pet HP", format("%.0f%%", context.pet_hp or 0) end
                 return "Pet", "Inactive"
             end,
+            -- Threat validation readout (toggle: "Show Threat Readout"). Lines hide
+            -- themselves (nil label) when the toggle is off.
+            function(context)
+                if not (context.settings and context.settings.threat_show_status) then return nil end
+                local HT = NS.HunterThreat
+                if not HT then return "Threat", "n/a" end
+                local pct, isTanking, have, raw = HT.Read("target")
+                if not have then return "Threat", "no data" end
+                return "Threat", format("scaled %d  raw %d%s", pct, raw, isTanking and "  AGGRO!" or "")
+            end,
+            function(context)
+                if not (context.settings and context.settings.threat_show_status) then return nil end
+                local cd = (A.FeignDeath and A.FeignDeath:GetCooldown()) or 0
+                if cd <= 0 then return "Feign", "ready" end
+                return "Feign", format("CD %.0fs", cd)
+            end,
+            function(context)
+                if not (context.settings and context.settings.threat_show_status) then return nil end
+                if not context.settings.threat_throttle_enabled then return "Throttle", "off" end
+                local HT = NS.HunterThreat
+                if not HT then return nil end
+                local action = HT.Action(context, "target")
+                local mode = (action == "fd" and "FEIGN") or (action == "hold" and "AUTO-ONLY") or "full DPS"
+                return "Throttle", mode
+            end,
         },
     },
 })
