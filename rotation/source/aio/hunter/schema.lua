@@ -112,6 +112,10 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
               tooltip = "Backstop for when Feign is on cooldown: at/above this threat, stop all specials and Auto-Shot-only so you don't pull while waiting for Feign. With Weave-Safe ON this is capped to a melee-safe ~90. You're also auto-Feigned the instant you actually pull, whatever this is set to.", format = "%d%%" },
             { type = "checkbox", key = "threat_show_status", default = false, label = "Show Threat Readout (dashboard)",
               tooltip = "Adds live threat lines to the combat dashboard (/flux status): scaled% + raw% (to validate the API -- watch which one hits the pull point when you take aggro), Feign Death cooldown, and the current throttle mode (full DPS / AUTO-ONLY / FEIGN). Use it to calibrate, then turn off." },
+            { type = "checkbox", key = "threat_hud", default = false, label = "Standalone Threat HUD",
+              tooltip = "Show a large, movable threat overlay (big scaled% color-coded by pull distance, raw%, Feign cooldown, throttle mode) separate from the dashboard. Drag to move; click x to hide. Best when threat is the thing you're watching." },
+            { type = "slider_decimal", key = "threat_hud_scale", default = 1.5, min = 1, max = 3, precision = 1, label = "Threat HUD Scale",
+              tooltip = "Size of the standalone Threat HUD." },
         }},
     }},
 
