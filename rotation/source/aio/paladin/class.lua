@@ -61,6 +61,9 @@ Action[A.PlayerClass] = {
     -- Healing rank tables (for downranking)
     -- isRank = N tells the framework to cast the specific rank, not max
     HolyLightR1  = Create({ Type = "Spell", ID = 635, isRank = 1 }),
+    -- Self-cast HL R1 for the Light's Grace weave (explicit self target so it
+    -- always lands and never touches HE's macro or the downranker's R1 object).
+    HolyLightR1Self = Create({ Type = "Spell", ID = 635, isRank = 1, Click = { unit = "player", type = "spell", spell = 635 } }),
     HolyLightR2  = Create({ Type = "Spell", ID = 639, isRank = 2 }),
     HolyLightR3  = Create({ Type = "Spell", ID = 647, isRank = 3 }),
     HolyLightR4  = Create({ Type = "Spell", ID = 1026, isRank = 4 }),
@@ -274,7 +277,7 @@ NS.SEAL_BLOOD_BUFF_ID = SEAL_BLOOD_BUFF_ID
 -- ============================================================================
 rotation_registry:register_class({
     name = "Paladin",
-    version = "v1.13.0",
+    version = "v1.14.0",
     playstyles = { "retribution", "protection", "holy" },
     idle_playstyle_name = nil,
 
