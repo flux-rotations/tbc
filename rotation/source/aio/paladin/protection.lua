@@ -46,8 +46,39 @@ local UnitIsVisible = _G.UnitIsVisible
 local UnitGUID = _G.UnitGUID
 local GetTime = _G.GetTime
 
--- Pre-allocated Click table for Righteous Defense (must target the friendly being attacked)
-local rd_click = { unit = "targettarget" }
+-- Pre-allocated Click table for Righteous Defense (friendly unit is set per cast)
+local rd_click = { unit = nil }
+
+-- Live table of active enemy nameplates + friendly GUID->unitID cache (taunt scan)
+local ActiveUnitPlates = MultiUnits:GetActiveUnitPlates()
+local TeamCacheFriendlyGUIDs = A.TeamCache and A.TeamCache.Friendly and A.TeamCache.Friendly.GUIDs
+
+-- Target-independent taunt scan: find an elite/boss that is attacking a friendly
+-- party/raid member who ISN'T us (a loose add), and return that friendly's unitID
+-- so Righteous Defense (cast on the friendly) yanks its attackers onto us. This
+-- replaces the old "our target's target" logic, which stalled whenever we were
+-- targeting the mob already on us. Healer-attackers are preferred.
+local function find_taunt_friendly()
+    if not ActiveUnitPlates or not TeamCacheFriendlyGUIDs then return nil end
+    local fallback
+    for enemy in pairs(ActiveUnitPlates) do
+        if UnitExists(enemy) and not UnitIsDead(enemy) and not UnitIsPlayer(enemy) then
+            local cls = UnitClassification(enemy)
+            if (cls == "elite" or cls == "worldboss" or cls == "rareelite")
+                and (Unit(enemy):InCC() or 0) <= Constants.TAUNT.CC_THRESHOLD then
+                local victimGUID = UnitGUID(enemy .. "target")
+                local victim = victimGUID and TeamCacheFriendlyGUIDs[victimGUID]
+                if victim and not UnitIsUnit(victim, PLAYER_UNIT) then
+                    if Unit(victim):IsHealer() then
+                        return victim  -- healer under attack: taunt immediately
+                    end
+                    fallback = fallback or victim
+                end
+            end
+        end
+    end
+    return fallback
+end
 
 -- ============================================================================
 -- THREAT HELPERS (for threat-aware tab targeting, ported from Warrior Prot)
@@ -143,27 +174,6 @@ local function get_prot_state(context)
     prot_state.can_exorcism = context.mana_pct > Constants.MANA.EXORCISM_PCT
 
     return prot_state
-end
-
--- ============================================================================
--- TAUNT HELPER FUNCTIONS (matching Druid Growl/Warrior Taunt pattern)
--- ============================================================================
-
--- Reliable aggro check: target is targeting us
-local function has_target_aggro()
-    return UnitExists("targettarget") and UnitIsUnit("targettarget", PLAYER_UNIT)
-end
-
--- Check if target is CC'd above a threshold
-local function is_target_cc_locked(threshold)
-    local cc_remaining = Unit(TARGET_UNIT):InCC() or 0
-    return cc_remaining > threshold
-end
-
--- Check if targettarget (the friendly being attacked) is a healer
-local function is_targettarget_healer()
-    if not UnitExists("targettarget") then return false end
-    return Unit("targettarget"):IsHealer() == true
 end
 
 -- ============================================================================
@@ -636,9 +646,9 @@ local Prot_AvengersShield = {
     end,
 }
 
--- [13] Righteous Defense (smart taunt — classification filtering, CC/TTD checks)
--- RD targets a FRIENDLY unit and taunts up to 3 enemies attacking that friendly.
--- Flow: our target (enemy) lost aggro on us → cast RD on targettarget (the friendly it's attacking).
+-- [13] Righteous Defense (target-independent taunt).
+-- Scans nameplates for an elite/boss loose on an ally and casts RD on that ally
+-- (taunts its attackers onto us). Works regardless of what we currently target.
 local Prot_RighteousDefense = {
     requires_combat = true,
     requires_enemy = true,
@@ -646,34 +656,15 @@ local Prot_RighteousDefense = {
 
     matches = function(context, state)
         if context.settings.prot_no_taunt then return false end
-        -- Only taunt NPCs, not players
-        if UnitIsPlayer(TARGET_UNIT) then return false end
-        -- Skip if target is CC'd (taunting wastes 15s CD)
-        if is_target_cc_locked(Constants.TAUNT.CC_THRESHOLD) then return false end
-        -- Skip if we already have aggro
-        if has_target_aggro() then return false end
-        -- Only taunt elites and bosses — don't waste 15s CD on trash
-        local classification = UnitClassification(TARGET_UNIT)
-        if classification ~= "elite" and classification ~= "worldboss" and classification ~= "rareelite" then return false end
-        -- Need a valid friendly to cast RD on (targettarget = the party member our target is attacking)
-        if not UnitExists("targettarget") then return false end
-        -- TTD check: skip dying mobs to save taunt CD
-        -- Exception: ALWAYS taunt if mob is attacking a healer
-        local targeting_healer = is_targettarget_healer()
-        if not targeting_healer and context.ttd < Constants.TAUNT.MIN_TTD then return false end
-        return true
+        state.taunt_victim = find_taunt_friendly()
+        return state.taunt_victim ~= nil and A.RighteousDefense:IsReady(state.taunt_victim)
     end,
 
     execute = function(icon, context, state)
-        -- Cast RD on the friendly being attacked (targettarget)
-        if A.RighteousDefense:IsReady("targettarget") then
-            A.RighteousDefense.Click = rd_click
-            local targeting_healer = is_targettarget_healer()
-            local reason = targeting_healer and "HEALER TARGETED" or "taunting"
-            return A.RighteousDefense:Show(icon),
-                format("[PROT] Righteous Defense - Lost aggro - %s (TTD: %.0fs)", reason, context.ttd)
-        end
-        return nil
+        rd_click.unit = state.taunt_victim
+        A.RighteousDefense.Click = rd_click
+        return A.RighteousDefense:Show(icon),
+            format("[PROT] Righteous Defense -> %s (add loose on ally)", state.taunt_victim)
     end,
 }
 

@@ -15,6 +15,42 @@ import { url } from '../config';
     </section>
 
     <section class="section changelog-entry">
+      <h2>v1.19.0 <span class="changelog-date">2026</span></h2>
+      <span class="changelog-tag tag-feature">Feature</span>
+      <span class="changelog-tag tag-fix">Fix</span>
+
+      <h3>Paladin &mdash; Holy (rebuilt)</h3>
+      <ul class="features">
+        <li><strong>HealingEngine-driven targeting</strong> &mdash; Holy now heals whoever the HealingEngine surfaces (via a prediction hook), instead of a hand-rolled scan &mdash; so it reacts to incoming damage, absorbs and threat like the engine does.</li>
+        <li><strong>Holy Light / Flash of Light selection with downranking</strong> &mdash; Picks Holy Light for real hits (or Divine Favor / Mortal-Strike targets) and the cheaper Flash of Light for light topping, then downranks to the rank that fits the wound &mdash; matching the top holy-paladin parses.</li>
+        <li><strong>Mana conserve mode</strong> &mdash; Below a configurable mana floor it flips from Holy Light to efficient Flash of Light, so mana hovers at the floor instead of bottoming out on long fights.</li>
+        <li><strong>Light&rsquo;s Grace weave</strong> &mdash; In a safe window with healthy mana, weaves a cheap Holy Light to keep the &minus;0.5s cast-time buff warm for your next real cast (toggleable).</li>
+        <li><strong>Cancel wasted heals</strong> &mdash; Stops a mid-cast Holy Light / Flash of Light if the target died or the engine moved to a better one, and re-fires on the right unit.</li>
+        <li><strong>Healing Assignment filter</strong> &mdash; Checkboxes to restrict healing/cleansing to Tanks / Self / Healers / DPS &mdash; uncheck the rest for a tank-only assignment.</li>
+        <li><strong>Removed Holy Shock</strong> from the rotation.</li>
+      </ul>
+
+      <h3>Paladin &mdash; Protection</h3>
+      <ul class="features">
+        <li><strong>Fixed Righteous Defense taunt</strong> &mdash; It now scans for an elite/boss loose on an ally and taunts it off them, independent of your current target (the old logic stalled whenever you were already targeting the mob on you). Adds on a healer are taunted first.</li>
+      </ul>
+
+      <h3>Paladin &mdash; General</h3>
+      <ul class="features">
+        <li><strong>Aura selector</strong> &mdash; Choose which aura to keep up (Auto by spec, or a specific one).</li>
+        <li><strong>Auto Self-Blessing toggle</strong> &mdash; Turn off self-blessing in raids where Pally Power (or another paladin) manages your blessings.</li>
+      </ul>
+
+      <h3>Priest &mdash; Holy &amp; Discipline (rebuilt)</h3>
+      <ul class="features">
+        <li><strong>HealingEngine-driven targeting</strong> &mdash; Both healing specs now heal the engine&rsquo;s chosen target (with a prediction hook that surfaces shield / HoT / dispel targets), replacing the duplicate custom scanner.</li>
+        <li><strong>Log-informed spell priority</strong> &mdash; Flash Heal is the primary heal (downranked to fit), Greater Heal fires only when free (Inner Focus / Holy Concentration), with Renew, Circle of Healing and Prayer of Mending doing the heavy lifting &mdash; mirroring the #1 holy-priest parses.</li>
+        <li><strong>Mana conserve mode</strong> &mdash; A sliding Flash-Heal threshold that stops topping people off when mana runs low (Discipline drops hard-cast Greater Heal).</li>
+        <li><strong>Dispel</strong> &mdash; Optional Dispel Magic / Abolish Disease on afflicted party members.</li>
+      </ul>
+    </section>
+
+    <section class="section changelog-entry">
       <h2>v1.18.0 <span class="changelog-date">2026</span></h2>
       <span class="changelog-tag tag-feature">Feature</span>
       <span class="changelog-tag tag-fix">Fix</span>

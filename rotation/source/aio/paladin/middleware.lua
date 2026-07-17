@@ -291,6 +291,17 @@ rotation_registry:register_middleware({
 -- ============================================================================
 -- SELF-BUFF: AURA (Out of combat)
 -- ============================================================================
+-- Map the aura_choice setting to its Action object (nil = "auto" spec default).
+local AURA_BY_CHOICE = {
+    devotion      = A.DevotionAura,
+    retribution   = A.RetributionAura,
+    concentration = A.ConcentrationAura,
+    sanctity      = A.SanctityAura,
+    shadow_resist = A.ShadowResistAura,
+    frost_resist  = A.FrostResistAura,
+    fire_resist   = A.FireResistAura,
+}
+
 rotation_registry:register_middleware({
     name = "Paladin_SelfBuffAura",
     priority = Priority.MIDDLEWARE.SELF_BUFF_OOC + 10,
@@ -298,12 +309,26 @@ rotation_registry:register_middleware({
     matches = function(context)
         if context.in_combat then return false end
         if context.is_mounted then return false end
-        -- Check if any aura is active
+        -- Explicit aura choice: keep exactly that one up
+        local chosen = AURA_BY_CHOICE[context.settings.aura_choice or "auto"]
+        if chosen then
+            return (Unit(PLAYER_UNIT):HasBuffs(chosen.ID) or 0) == 0
+        end
+        -- Auto: apply the spec default when no aura at all is active
         if (Unit(PLAYER_UNIT):HasBuffs(Constants.AURA_BUFF_IDS) or 0) > 0 then return false end
         return true
     end,
 
     execute = function(icon, context)
+        -- Explicit aura choice overrides the spec default
+        local chosen = AURA_BY_CHOICE[context.settings.aura_choice or "auto"]
+        if chosen then
+            if chosen:IsReady(PLAYER_UNIT) then
+                return chosen:Show(icon), "[MW] Aura: " .. context.settings.aura_choice
+            end
+            return nil
+        end
+
         local spec = context.settings.playstyle or "retribution"
 
         -- Ret: Sanctity Aura if known, else Devotion
@@ -348,6 +373,8 @@ rotation_registry:register_middleware({
     priority = Priority.MIDDLEWARE.SELF_BUFF_OOC,
 
     matches = function(context)
+        -- Off = let Pally Power / another paladin manage blessings (raids)
+        if context.settings.use_blessings == false then return false end
         if context.in_combat then return false end
         if context.is_mounted then return false end
         -- Check if any blessing is active

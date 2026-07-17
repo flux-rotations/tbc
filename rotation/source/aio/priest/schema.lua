@@ -154,8 +154,8 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
         { header = "AoE Healing", settings = {
             { type = "slider", key = "holy_aoe_hp", default = 80, min = 40, max = 100, label = "AoE Heal HP%",
               tooltip = "AoE heals when members below this%.", format = "%d%%" },
-            { type = "slider", key = "holy_aoe_count", default = 3, min = 2, max = 5, label = "AoE Heal Count",
-              tooltip = "Minimum damaged members for AoE heal.", format = "%d" },
+            { type = "slider", key = "holy_aoe_count", default = 2, min = 2, max = 5, label = "AoE Heal Count",
+              tooltip = "Minimum damaged members for AoE heal. TBC Circle of Healing has no cooldown, so 2 keeps it flowing.", format = "%d" },
         }},
         { header = "Emergency", settings = {
             { type = "checkbox", key = "holy_use_pws", default = true, label = "PW:S Emergency",
@@ -174,6 +174,8 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
               tooltip = "Use Prayer of Healing for group damage." },
             { type = "checkbox", key = "holy_use_inner_focus", default = true, label = "Inner Focus",
               tooltip = "Use Inner Focus before Greater Heal for free cast + 25% crit." },
+            { type = "checkbox", key = "holy_use_dispel", default = true, label = "Dispel Magic/Disease",
+              tooltip = "Prioritize and cast Dispel Magic / Abolish Disease on afflicted party members." },
         }},
         { header = "Pre-Pull & Idle", settings = {
             { type = "checkbox", key = "holy_prepull_pom", default = true, label = "Pre-Pull PoM",
@@ -184,6 +186,8 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
               tooltip = "Cast damage spells when everyone is healthy and mana is above floor." },
             { type = "slider", key = "holy_dps_mana_floor", default = 70, min = 40, max = 90, label = "DPS Mana Floor%",
               tooltip = "Only DPS when mana above this%.", format = "%d%%" },
+            { type = "slider", key = "holy_conserve_pct", default = 40, min = 15, max = 80, label = "Conserve Mana Below%",
+              tooltip = "Below this mana%, stop hard-casting Flash Heal to top people off; ride Renew/CoH/PoM and reserve Flash for real damage. Higher = conserve sooner.", format = "%d%%" },
         }},
     }},
 
@@ -210,6 +214,8 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
               tooltip = "Use Power Infusion (if talented)." },
             { type = "checkbox", key = "disc_use_inner_focus", default = true, label = "Inner Focus",
               tooltip = "Use Inner Focus with Greater Heal." },
+            { type = "checkbox", key = "disc_use_dispel", default = true, label = "Dispel Magic/Disease",
+              tooltip = "Prioritize and cast Dispel Magic / Abolish Disease on afflicted party members." },
         }},
         { header = "HoTs", settings = {
             { type = "slider", key = "disc_renew_hp", default = 85, min = 50, max = 100, label = "Renew HP%",
@@ -224,6 +230,10 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
               tooltip = "Cast PW:S on tank before pull (between pulls)." },
             { type = "checkbox", key = "disc_prepull_renew", default = true, label = "Pre-Pull Renew",
               tooltip = "Cast Renew on tank before pull (between pulls)." },
+        }},
+        { header = "Mana", settings = {
+            { type = "slider", key = "disc_conserve_pct", default = 35, min = 15, max = 80, label = "Conserve Mana Below%",
+              tooltip = "Below this mana%, stop hard-casting Greater Heal to top people off; ride PW:S/Renew/Flash and reserve big heals for real damage.", format = "%d%%" },
         }},
     }},
 

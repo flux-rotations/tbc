@@ -51,6 +51,26 @@ Action[A.PlayerClass] = {
     FlashHeal        = Create({ Type = "Spell", ID = 2061, useMaxRank = true }),
     GreaterHeal      = Create({ Type = "Spell", ID = 2060, useMaxRank = true }),
     Renew            = Create({ Type = "Spell", ID = 139, useMaxRank = true }),
+
+    -- Explicit heal ranks for downranking. isRank forces the specific rank; we
+    -- pick the rank ourselves via deficit math (see healing.lua select_rank).
+    FlashHealR1  = Create({ Type = "Spell", ID = 2061,  isRank = 1 }),
+    FlashHealR2  = Create({ Type = "Spell", ID = 9472,  isRank = 2 }),
+    FlashHealR3  = Create({ Type = "Spell", ID = 9473,  isRank = 3 }),
+    FlashHealR4  = Create({ Type = "Spell", ID = 9474,  isRank = 4 }),
+    FlashHealR5  = Create({ Type = "Spell", ID = 10915, isRank = 5 }),
+    FlashHealR6  = Create({ Type = "Spell", ID = 10916, isRank = 6 }),
+    FlashHealR7  = Create({ Type = "Spell", ID = 10917, isRank = 7 }),
+    FlashHealR8  = Create({ Type = "Spell", ID = 25233, isRank = 8 }),
+    FlashHealR9  = Create({ Type = "Spell", ID = 25235, isRank = 9 }),
+
+    GreaterHealR1 = Create({ Type = "Spell", ID = 2060,  isRank = 1 }),
+    GreaterHealR2 = Create({ Type = "Spell", ID = 10963, isRank = 2 }),
+    GreaterHealR3 = Create({ Type = "Spell", ID = 10964, isRank = 3 }),
+    GreaterHealR4 = Create({ Type = "Spell", ID = 10965, isRank = 4 }),
+    GreaterHealR5 = Create({ Type = "Spell", ID = 25314, isRank = 5 }),
+    GreaterHealR6 = Create({ Type = "Spell", ID = 25210, isRank = 6 }),
+    GreaterHealR7 = Create({ Type = "Spell", ID = 25213, isRank = 7 }),
     PrayerOfHealing  = Create({ Type = "Spell", ID = 596, useMaxRank = true }),
     PowerWordShield  = Create({ Type = "Spell", ID = 17, useMaxRank = true }),
     PrayerOfMending  = Create({ Type = "Spell", ID = 33076 }),
@@ -102,6 +122,34 @@ Action[A.PlayerClass] = {
 -- ============================================================================
 local A = setmetatable(Action[A.PlayerClass], { __index = Action })
 NS.A = A
+
+-- Downranking rank tables (highest -> lowest) with TBC base heal min/max, for
+-- explicit deficit-based rank selection (the framework's PredictHeal errors on
+-- bare isRank objects, so we do the math ourselves).
+NS.FLASH_HEAL_RANKS = {
+    { spell = A.FlashHealR9, base_min = 1101, base_max = 1310 },
+    { spell = A.FlashHealR8, base_min = 913,  base_max = 1084 },
+    { spell = A.FlashHealR7, base_min = 812,  base_max = 968 },
+    { spell = A.FlashHealR6, base_min = 644,  base_max = 773 },
+    { spell = A.FlashHealR5, base_min = 517,  base_max = 621 },
+    { spell = A.FlashHealR4, base_min = 400,  base_max = 482 },
+    { spell = A.FlashHealR3, base_min = 329,  base_max = 397 },
+    { spell = A.FlashHealR2, base_min = 258,  base_max = 314 },
+    { spell = A.FlashHealR1, base_min = 202,  base_max = 247 },
+}
+NS.GREATER_HEAL_RANKS = {
+    { spell = A.GreaterHealR7, base_min = 2314, base_max = 2591 },
+    { spell = A.GreaterHealR6, base_min = 1953, base_max = 2181 },
+    { spell = A.GreaterHealR5, base_min = 1516, base_max = 1694 },
+    { spell = A.GreaterHealR4, base_min = 1470, base_max = 1642 },
+    { spell = A.GreaterHealR3, base_min = 1275, base_max = 1428 },
+    { spell = A.GreaterHealR2, base_min = 1090, base_max = 1225 },
+    { spell = A.GreaterHealR1, base_min = 924,  base_max = 1039 },
+}
+-- Direct-heal coefficients (castTime / 3.5) and assumed 5/5 Spiritual Healing.
+NS.FLASH_HEAL_COEFF = 0.4286
+NS.GREATER_HEAL_COEFF = 0.8571
+NS.PRIEST_HEAL_MULT = 1.10
 
 local Player = NS.Player
 local Unit = NS.Unit
@@ -157,7 +205,7 @@ NS.Constants = Constants
 -- ============================================================================
 rotation_registry:register_class({
     name = "Priest",
-    version = "v1.9.0",
+    version = "v1.10.0",
     playstyles = { "shadow", "smite", "holy", "discipline" },
     idle_playstyle_name = nil,
 

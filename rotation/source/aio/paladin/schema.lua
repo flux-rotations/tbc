@@ -43,6 +43,22 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
             { type = "checkbox", key = "use_auto_freedom", default = false, label = "Auto Freedom",
               tooltip = "Cast Blessing of Freedom on yourself when rooted or snared. Removes movement-impairing effects only — does NOT break stuns, fears, or polymorph." },
         }},
+        { header = "Buffs", settings = {
+            { type = "checkbox", key = "use_blessings", default = true, label = "Auto Self-Blessing",
+              tooltip = "Keep a self-blessing up (Might/Wisdom/Kings by spec). Turn OFF in raids where Pally Power (or another paladin) manages your blessings." },
+            { type = "dropdown", key = "aura_choice", default = "auto", label = "Aura",
+              tooltip = "Which aura to keep active. Auto picks the best for your spec.",
+              options = {
+                  { value = "auto", text = "Auto (by spec)" },
+                  { value = "devotion", text = "Devotion Aura" },
+                  { value = "retribution", text = "Retribution Aura" },
+                  { value = "concentration", text = "Concentration Aura" },
+                  { value = "sanctity", text = "Sanctity Aura" },
+                  { value = "shadow_resist", text = "Shadow Resistance" },
+                  { value = "frost_resist", text = "Frost Resistance" },
+                  { value = "fire_resist", text = "Fire Resistance" },
+              }},
+        }},
         { header = "Cooldown Management", settings = {
             { type = "slider", key = "cd_min_ttd", default = 0, min = 0, max = 60, label = "CD Min TTD (sec)",
               tooltip = "Don't use major CDs (trinkets, racial) if target dies sooner than this. Set to 0 to disable.", format = "%d sec" },
@@ -182,10 +198,16 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
     -- Tab 4: Holy
     [4] = { name = "Holy", sections = {
         { header = "Healing", settings = {
-            { type = "checkbox", key = "holy_use_holy_shock", default = true, label = "Holy Shock",
-              tooltip = "Use Holy Shock as instant heal when target in range (20yd, 15s CD)." },
             { type = "slider", key = "proactive_fol_mana_floor", default = 30, min = 10, max = 60, label = "Proactive FoL Mana Floor (%)",
               tooltip = "Stop proactive FoL on tank when mana drops below this percent.", format = "%d%%" },
+            { type = "slider", key = "holy_conserve_pct", default = 40, min = 15, max = 80, label = "Conserve Mana Below (%)",
+              tooltip = "Below this mana%, switch from Holy Light (throughput) to Flash of Light (efficient) as the main heal. Higher = conserve sooner.", format = "%d%%" },
+            { type = "checkbox", key = "holy_lights_grace_weave", default = true, label = "Light's Grace Weave",
+              tooltip = "In a safe window with healthy mana (>=65%), cast a self Holy Light R1 to keep the Light's Grace buff up, so your next real Holy Light is 0.5s faster. Costs a 2.5s filler cast." },
+            { type = "checkbox", key = "holy_cancel_wasted", default = true, label = "Cancel Wasted Heals",
+              tooltip = "/stopcasting a Holy Light / Flash of Light mid-cast if the target died or the Healing Engine moved to a better target (needs you spamming the heal key). Re-fires on the right unit." },
+            { type = "slider", key = "holy_cancel_min_left", default = 0.8, min = 0.3, max = 2.0, label = "Cancel Min Cast Left (s)",
+              tooltip = "Only cancel when at least this many seconds of cast remain, so a near-complete cast is finished instead of wasted.", format = "%.1fs" },
         }},
         { header = "Cooldowns", settings = {
             { type = "checkbox", key = "holy_use_divine_favor", default = true, label = "Divine Favor",
@@ -212,6 +234,16 @@ _G.FluxAIO_SETTINGS_SCHEMA = {
               }},
             { type = "checkbox", key = "holy_use_cleanse", default = true, label = "Auto Cleanse Party",
               tooltip = "Automatically Cleanse debuffs from party members." },
+        }},
+        { header = "Healing Assignment", settings = {
+            { type = "checkbox", key = "holy_heal_tanks", default = true, label = "Heal Tanks",
+              tooltip = "Include tanks (threat-detected) as heal/cleanse targets." },
+            { type = "checkbox", key = "holy_heal_self", default = true, label = "Heal Self",
+              tooltip = "Include yourself as a heal target." },
+            { type = "checkbox", key = "holy_heal_healers", default = true, label = "Heal Healers",
+              tooltip = "Include other healers as heal targets." },
+            { type = "checkbox", key = "holy_heal_dps", default = true, label = "Heal DPS",
+              tooltip = "Include damage dealers as heal targets. Uncheck (with Healers) for a tank-only assignment." },
         }},
     }},
 
