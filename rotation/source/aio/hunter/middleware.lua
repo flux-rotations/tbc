@@ -144,6 +144,9 @@ rotation_registry:register_middleware({
     priority = Priority.MIDDLEWARE.DISPEL_CURSE,
     is_defensive = true,
     setting_key = "use_feign_death",
+    -- Feign Death is off-GCD -- fire it the instant aggro flips, not up to a full
+    -- GCD later (without this it's skipped while on_gcd, i.e. right after a shot).
+    is_gcd_gated = false,
 
     matches = function(context)
         if not context.in_combat then return false end
