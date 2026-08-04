@@ -15,6 +15,20 @@ import { url } from '../config';
     </section>
 
     <section class="section changelog-entry">
+      <h2>v1.20.0 <span class="changelog-date">2026</span></h2>
+      <span class="changelog-tag tag-feature">Feature</span>
+
+      <h3>Hunter &mdash; Threat Management</h3>
+      <ul class="features">
+        <li><strong>Threat throttle</strong> &mdash; Opt-in threat management measured against whoever is actually tanking (a group tank <em>or</em> your pet, so it works solo). Above a threshold it Feigns Death on cooldown to keep threat low, and if Feign is down near the pull it drops to Auto Shot only rather than pulling. Off by default; a no-op on servers with no threat API.</li>
+        <li><strong>Weave-Safe melee cap</strong> &mdash; Aggro pulls at roughly 110% of the tank&rsquo;s threat in melee versus ~130% at range, so sitting &ldquo;safe&rdquo; at range can one-shot you the instant you step in to Raptor weave. Weave-Safe holds you under the melee pull point at all times, with a configurable Melee Safety Cap.</li>
+        <li><strong>Feign Death before Readiness</strong> &mdash; Optionally Feign right before Readiness fires: Readiness resets Feign so it costs you nothing, and your post-Readiness burst climbs from a clean threat slate.</li>
+        <li><strong>Faster emergency Feign</strong> &mdash; Feign Death is off the global cooldown, so the auto-Feign now fires the instant aggro flips instead of waiting out the GCD after a shot.</li>
+        <li><strong>Threat readout &amp; standalone HUD</strong> &mdash; Adds live threat lines to the combat dashboard (scaled %, raw %, Feign cooldown, throttle mode), plus an optional large movable Threat HUD colour-coded by how close you are to pulling. Both off by default.</li>
+      </ul>
+    </section>
+
+    <section class="section changelog-entry">
       <h2>v1.19.0 <span class="changelog-date">2026</span></h2>
       <span class="changelog-tag tag-feature">Feature</span>
       <span class="changelog-tag tag-fix">Fix</span>
